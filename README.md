@@ -5,7 +5,9 @@ Exposure AI Academy · Project 9 — React Native + Expo + Local Notifications i
 ## Özellikler
 
 - Sınırsız goal oluşturma, düzenleme, silme ve tamamlama (undo destekli)
-- Her goal'da zorunlu bitiş tarihi + "X gün önce hatırlat" seçeneği
+- İki goal türü:
+  - **Tek Seferlik**: zorunlu bitiş tarihi + "X gün önce hatırlat" (tek seferlik reminder)
+  - **Tekrarlayan**: bitiş tarihi yok, her gün seçilen saatte tekrar eden hatırlatma; günlük "bugün tamamlandı" toggle'ı ile işaretlenir (brief'in temel kapsamının ötesinde eklenen bonus özellik)
 - `expo-notifications` ile cihaz içi zamanlanmış local notification (remote push yok)
 - Goal edit/delete/complete olduğunda eski notification otomatik cancel/reschedule edilir
 - Active / Overdue / Completed durumları ayrı bölümlerde, net badge'lerle gösterilir
