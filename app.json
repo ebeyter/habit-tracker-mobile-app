@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "my-apphabittracker",
+    "name": "Habit Tracker",
     "slug": "my-apphabittracker",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -9,7 +9,8 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.my-apphabittracker"
     },
     "android": {
       "adaptiveIcon": {
@@ -37,6 +38,14 @@
           "dark": {
             "backgroundColor": "#000000"
           }
+        }
+      ],
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/icon.png",
+          "color": "#5B5BD6"
         }
       ]
     ],
