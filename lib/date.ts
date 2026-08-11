@@ -44,3 +44,22 @@ export function daysUntil(dateIso: string): number {
   const diffMs = d.getTime() - today().getTime();
   return Math.round(diffMs / (24 * 60 * 60 * 1000));
 }
+
+/** "HH:mm" from a Date, local time */
+export function formatTimeOfDay(hhmm: string): string {
+  const [h, m] = hhmm.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d.toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' });
+}
+
+export function timeToHHMM(date: Date): string {
+  return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`;
+}
+
+export function hhmmToDate(hhmm: string): Date {
+  const [h, m] = hhmm.split(':').map(Number);
+  const d = new Date();
+  d.setHours(h, m, 0, 0);
+  return d;
+}

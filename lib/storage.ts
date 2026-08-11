@@ -5,11 +5,19 @@ import type { Goal, StreakData } from './types';
 const GOALS_KEY = '@habit-tracker/goals';
 const STREAK_KEY = '@habit-tracker/streak';
 
+function isValidGoal(g: unknown): g is Goal {
+  const kind = (g as { kind?: unknown } | null)?.kind;
+  return kind === 'onetime' || kind === 'recurring';
+}
+
 export async function getGoals(): Promise<Goal[]> {
   const raw = await AsyncStorage.getItem(GOALS_KEY);
   if (!raw) return [];
   try {
-    return JSON.parse(raw) as Goal[];
+    const parsed = JSON.parse(raw) as unknown;
+    if (!Array.isArray(parsed)) return [];
+    // Drops entries from an older, incompatible schema (e.g. missing `kind`) instead of crashing.
+    return parsed.filter(isValidGoal);
   } catch {
     return [];
   }

@@ -11,29 +11,46 @@ import { StreakHeader } from '@/components/StreakHeader';
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { isPastDay } from '@/lib/date';
-import type { Goal } from '@/lib/types';
+import type { Goal, OneTimeGoal, RecurringGoal } from '@/lib/types';
 
 export default function GoalsScreen() {
   const { colors, spacing, radius } = useAppTheme();
-  const { goals, streak, permissionStatus, loading, completeGoal, undoComplete, deleteGoal } = useGoals();
+  const {
+    goals,
+    streak,
+    permissionStatus,
+    loading,
+    completeGoal,
+    undoComplete,
+    toggleRecurringToday,
+    deleteGoal,
+  } = useGoals();
 
   const sections = useMemo(() => {
-    const overdue: Goal[] = [];
-    const active: Goal[] = [];
-    const completed: Goal[] = [];
+    const recurring: RecurringGoal[] = [];
+    const overdue: OneTimeGoal[] = [];
+    const active: OneTimeGoal[] = [];
+    const completed: OneTimeGoal[] = [];
 
     for (const goal of goals) {
-      if (goal.status === 'completed') completed.push(goal);
-      else if (isPastDay(new Date(goal.deadline))) overdue.push(goal);
-      else active.push(goal);
+      if (goal.kind === 'recurring') {
+        recurring.push(goal);
+      } else if (goal.status === 'completed') {
+        completed.push(goal);
+      } else if (isPastDay(new Date(goal.deadline))) {
+        overdue.push(goal);
+      } else {
+        active.push(goal);
+      }
     }
 
-    const byDeadline = (a: Goal, b: Goal) => a.deadline.localeCompare(b.deadline);
+    const byDeadline = (a: OneTimeGoal, b: OneTimeGoal) => a.deadline.localeCompare(b.deadline);
     overdue.sort(byDeadline);
     active.sort(byDeadline);
     completed.sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));
+    recurring.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
-    return { overdue, active, completed };
+    return { recurring, overdue, active, completed };
   }, [goals]);
 
   function confirmDelete(goal: Goal) {
@@ -77,6 +94,23 @@ export default function GoalsScreen() {
           <EmptyState onCreate={() => router.push('/goal-form')} />
         ) : (
           <>
+            {sections.recurring.length > 0 && (
+              <>
+                <SectionHeader title="Tekrarlayan Alışkanlıklar" count={sections.recurring.length} />
+                {sections.recurring.map((goal) => (
+                  <GoalCard
+                    key={goal.id}
+                    goal={goal}
+                    onComplete={() => {}}
+                    onUndo={() => {}}
+                    onToggleToday={() => toggleRecurringToday(goal.id)}
+                    onEdit={() => router.push({ pathname: '/goal-form', params: { id: goal.id } })}
+                    onDelete={() => confirmDelete(goal)}
+                  />
+                ))}
+              </>
+            )}
+
             {sections.overdue.length > 0 && (
               <>
                 <SectionHeader title="Gecikti" count={sections.overdue.length} />
@@ -86,6 +120,7 @@ export default function GoalsScreen() {
                     goal={goal}
                     onComplete={() => completeGoal(goal.id)}
                     onUndo={() => undoComplete(goal.id)}
+                    onToggleToday={() => {}}
                     onEdit={() => router.push({ pathname: '/goal-form', params: { id: goal.id } })}
                     onDelete={() => confirmDelete(goal)}
                   />
@@ -103,6 +138,7 @@ export default function GoalsScreen() {
                   goal={goal}
                   onComplete={() => completeGoal(goal.id)}
                   onUndo={() => undoComplete(goal.id)}
+                  onToggleToday={() => {}}
                   onEdit={() => router.push({ pathname: '/goal-form', params: { id: goal.id } })}
                   onDelete={() => confirmDelete(goal)}
                 />
@@ -118,6 +154,7 @@ export default function GoalsScreen() {
                     goal={goal}
                     onComplete={() => completeGoal(goal.id)}
                     onUndo={() => undoComplete(goal.id)}
+                    onToggleToday={() => {}}
                     onEdit={() => router.push({ pathname: '/goal-form', params: { id: goal.id } })}
                     onDelete={() => confirmDelete(goal)}
                   />

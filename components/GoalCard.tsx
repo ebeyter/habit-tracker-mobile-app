@@ -1,19 +1,65 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useAppTheme } from '@/hooks/use-app-theme';
-import { daysUntil, formatDate, isPastDay } from '@/lib/date';
+import { dayKey, daysUntil, formatDate, formatTimeOfDay, isPastDay } from '@/lib/date';
 import type { Goal } from '@/lib/types';
 
 type Props = {
   goal: Goal;
   onComplete: () => void;
   onUndo: () => void;
+  onToggleToday: () => void;
   onEdit: () => void;
   onDelete: () => void;
 };
 
-export function GoalCard({ goal, onComplete, onUndo, onEdit, onDelete }: Props) {
+export function GoalCard({ goal, onComplete, onUndo, onToggleToday, onEdit, onDelete }: Props) {
   const { colors, spacing, radius } = useAppTheme();
+
+  if (goal.kind === 'recurring') {
+    const doneToday = goal.completedDates.includes(dayKey(new Date()));
+    const badge = doneToday
+      ? { label: 'Bugün tamamlandı', bg: colors.successMuted, fg: colors.success }
+      : { label: 'Bugün bekliyor', bg: colors.warningMuted, fg: colors.warning };
+
+    return (
+      <View
+        style={[
+          styles.card,
+          { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm },
+        ]}
+      >
+        <View style={styles.headerRow}>
+          <Text style={[styles.title, { color: colors.text }]}>{goal.title}</Text>
+          <View style={[styles.badge, { backgroundColor: badge.bg }]}>
+            <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.label}</Text>
+          </View>
+        </View>
+
+        {!!goal.description && (
+          <Text style={[styles.description, { color: colors.textMuted }]} numberOfLines={3}>
+            {goal.description}
+          </Text>
+        )}
+
+        <Text style={[styles.meta, { color: colors.textMuted }]}>
+          Her gün {formatTimeOfDay(goal.reminderTime)} · {goal.completedDates.length} kez tamamlandı
+          {goal.notificationId === null ? ' · bildirim yok' : ''}
+        </Text>
+
+        <View style={[styles.actions, { gap: spacing.sm }]}>
+          <ActionButton
+            label={doneToday ? 'Geri Al' : 'Bugün Tamamla'}
+            onPress={onToggleToday}
+            bg={doneToday ? colors.border : colors.success}
+            fg={doneToday ? colors.text : '#fff'}
+          />
+          <ActionButton label="Düzenle" onPress={onEdit} bg={colors.border} fg={colors.text} />
+          <ActionButton label="Sil" onPress={onDelete} bg={colors.dangerMuted} fg={colors.danger} />
+        </View>
+      </View>
+    );
+  }
 
   const isOverdue = goal.status === 'active' && isPastDay(new Date(goal.deadline));
   const daysLeft = daysUntil(goal.deadline);

@@ -2,7 +2,7 @@ import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
 import { addDays, startOfDay } from './date';
-import type { Goal } from './types';
+import type { NewGoalInput } from './types';
 
 let handlerConfigured = false;
 
@@ -39,9 +39,17 @@ export async function requestPermission(): Promise<PermissionStatus> {
   return status as PermissionStatus;
 }
 
-function reminderDate(goal: Pick<Goal, 'deadline' | 'reminderDaysBefore'>): Date {
-  const deadlineDay = startOfDay(new Date(goal.deadline));
-  const day = addDays(deadlineDay, -goal.reminderDaysBefore);
+async function ensurePermission(): Promise<PermissionStatus> {
+  let status = await getPermissionStatus();
+  if (status === 'undetermined') {
+    status = await requestPermission();
+  }
+  return status;
+}
+
+function oneTimeReminderDate(deadline: string, reminderDaysBefore: number): Date {
+  const deadlineDay = startOfDay(new Date(deadline));
+  const day = addDays(deadlineDay, -reminderDaysBefore);
   day.setHours(9, 0, 0, 0);
   return day;
 }
@@ -51,18 +59,15 @@ export type ScheduleResult = {
   reason: 'past' | 'permission' | null;
 };
 
-export async function scheduleGoalReminder(
-  goal: Pick<Goal, 'title' | 'deadline' | 'reminderDaysBefore'>
+async function scheduleOneTimeReminder(
+  goal: Pick<Extract<NewGoalInput, { kind: 'onetime' }>, 'title' | 'deadline' | 'reminderDaysBefore'>
 ): Promise<ScheduleResult> {
-  const when = reminderDate(goal);
+  const when = oneTimeReminderDate(goal.deadline, goal.reminderDaysBefore);
   if (when.getTime() <= Date.now()) {
     return { notificationId: null, reason: 'past' };
   }
 
-  let status = await getPermissionStatus();
-  if (status === 'undetermined') {
-    status = await requestPermission();
-  }
+  const status = await ensurePermission();
   if (status !== 'granted') {
     return { notificationId: null, reason: 'permission' };
   }
@@ -84,6 +89,35 @@ export async function scheduleGoalReminder(
   return { notificationId, reason: null };
 }
 
+async function scheduleRecurringReminder(
+  goal: Pick<Extract<NewGoalInput, { kind: 'recurring' }>, 'title' | 'reminderTime'>
+): Promise<ScheduleResult> {
+  const status = await ensurePermission();
+  if (status !== 'granted') {
+    return { notificationId: null, reason: 'permission' };
+  }
+
+  const [hour, minute] = goal.reminderTime.split(':').map(Number);
+
+  const notificationId = await Notifications.scheduleNotificationAsync({
+    content: {
+      title: 'Günlük hatırlatma',
+      body: `"${goal.title}" için bugünü unutma!`,
+    },
+    trigger: {
+      type: Notifications.SchedulableTriggerInputTypes.DAILY,
+      hour,
+      minute,
+    },
+  });
+
+  return { notificationId, reason: null };
+}
+
+export async function scheduleGoalReminder(goal: NewGoalInput): Promise<ScheduleResult> {
+  return goal.kind === 'onetime' ? scheduleOneTimeReminder(goal) : scheduleRecurringReminder(goal);
+}
+
 export async function cancelGoalReminder(notificationId?: string | null): Promise<void> {
   if (!notificationId) return;
   try {
@@ -94,9 +128,7 @@ export async function cancelGoalReminder(notificationId?: string | null): Promis
 }
 
 export async function rescheduleGoalReminder(
-  goal: Pick<Goal, 'title' | 'deadline' | 'reminderDaysBefore'> & {
-    notificationId?: string | null;
-  }
+  goal: NewGoalInput & { notificationId?: string | null }
 ): Promise<ScheduleResult> {
   await cancelGoalReminder(goal.notificationId);
   return scheduleGoalReminder(goal);

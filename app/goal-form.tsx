@@ -16,10 +16,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
-import { addDays, formatDate, startOfDay, today } from '@/lib/date';
+import { addDays, formatDate, formatTimeOfDay, hhmmToDate, startOfDay, timeToHHMM, today } from '@/lib/date';
+import type { GoalKind } from '@/lib/types';
 
 const REMINDER_MIN = 0;
 const REMINDER_MAX = 30;
+const DEFAULT_REMINDER_TIME = '09:00';
 
 export default function GoalFormScreen() {
   const { colors, spacing, radius } = useAppTheme();
@@ -30,25 +32,32 @@ export default function GoalFormScreen() {
   const isEditing = !!editingGoal;
   const minDate = useMemo(() => addDays(today(), 1), []);
 
+  const [kind, setKind] = useState<GoalKind>('onetime');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState<Date | null>(null);
   const [reminderDaysBefore, setReminderDaysBefore] = useState(1);
-  const [showIosPicker, setShowIosPicker] = useState(false);
+  const [reminderTime, setReminderTime] = useState(DEFAULT_REMINDER_TIME);
+  const [showIosDatePicker, setShowIosDatePicker] = useState(false);
+  const [showIosTimePicker, setShowIosTimePicker] = useState(false);
   const [titleError, setTitleError] = useState<string | null>(null);
   const [deadlineError, setDeadlineError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    if (editingGoal) {
-      setTitle(editingGoal.title);
-      setDescription(editingGoal.description ?? '');
+    if (!editingGoal) return;
+    setKind(editingGoal.kind);
+    setTitle(editingGoal.title);
+    setDescription(editingGoal.description ?? '');
+    if (editingGoal.kind === 'onetime') {
       setDeadline(new Date(editingGoal.deadline));
       setReminderDaysBefore(editingGoal.reminderDaysBefore);
+    } else {
+      setReminderTime(editingGoal.reminderTime);
     }
   }, [editingGoal]);
 
-  function openPicker() {
+  function openDatePicker() {
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
         value: deadline ?? minDate,
@@ -62,7 +71,21 @@ export default function GoalFormScreen() {
         },
       });
     } else {
-      setShowIosPicker((v) => !v);
+      setShowIosDatePicker((v) => !v);
+    }
+  }
+
+  function openTimePicker() {
+    if (Platform.OS === 'android') {
+      DateTimePickerAndroid.open({
+        value: hhmmToDate(reminderTime),
+        mode: 'time',
+        onChange: (_event, selected) => {
+          if (selected) setReminderTime(timeToHHMM(selected));
+        },
+      });
+    } else {
+      setShowIosTimePicker((v) => !v);
     }
   }
 
@@ -78,7 +101,7 @@ export default function GoalFormScreen() {
     } else {
       setTitleError(null);
     }
-    if (!deadline) {
+    if (kind === 'onetime' && !deadline) {
       setDeadlineError('Bitiş tarihi zorunlu.');
       ok = false;
     } else {
@@ -88,15 +111,24 @@ export default function GoalFormScreen() {
   }
 
   async function handleSave() {
-    if (!validate() || !deadline) return;
+    if (!validate()) return;
     setSaving(true);
     try {
-      const input = {
-        title: title.trim(),
-        description: description.trim() || undefined,
-        deadline: startOfDay(deadline).toISOString(),
-        reminderDaysBefore,
-      };
+      const input =
+        kind === 'onetime'
+          ? {
+              kind: 'onetime' as const,
+              title: title.trim(),
+              description: description.trim() || undefined,
+              deadline: startOfDay(deadline!).toISOString(),
+              reminderDaysBefore,
+            }
+          : {
+              kind: 'recurring' as const,
+              title: title.trim(),
+              description: description.trim() || undefined,
+              reminderTime,
+            };
 
       const result = isEditing ? await updateGoal(editingGoal!.id, input) : await addGoal(input);
 
@@ -140,6 +172,30 @@ export default function GoalFormScreen() {
         keyboardVerticalOffset={12}
       >
         <ScrollView contentContainerStyle={{ padding: spacing.lg }} keyboardShouldPersistTaps="handled">
+          {!isEditing && (
+            <View style={[styles.segmented, { backgroundColor: colors.border, borderRadius: radius.pill }]}>
+              <SegmentButton
+                label="Tek Seferlik"
+                active={kind === 'onetime'}
+                onPress={() => setKind('onetime')}
+                colors={colors}
+                radius={radius}
+              />
+              <SegmentButton
+                label="Tekrarlayan"
+                active={kind === 'recurring'}
+                onPress={() => setKind('recurring')}
+                colors={colors}
+                radius={radius}
+              />
+            </View>
+          )}
+          {isEditing && (
+            <Text style={[styles.kindLabel, { color: colors.textMuted, marginBottom: spacing.md }]}>
+              Tür: {kind === 'onetime' ? 'Tek Seferlik (bitiş tarihli)' : 'Tekrarlayan (her gün)'}
+            </Text>
+          )}
+
           <Text style={[styles.label, { color: colors.textMuted }]}>Başlık</Text>
           <TextInput
             value={title}
@@ -147,7 +203,7 @@ export default function GoalFormScreen() {
               setTitle(t);
               if (t.trim()) setTitleError(null);
             }}
-            placeholder="Örn: Kitap bitir"
+            placeholder={kind === 'onetime' ? 'Örn: Kitap bitir' : 'Örn: 15 sayfa kitap oku'}
             placeholderTextColor={colors.textMuted}
             style={[
               styles.input,
@@ -178,51 +234,110 @@ export default function GoalFormScreen() {
             ]}
           />
 
-          <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>Bitiş Tarihi</Text>
-          <Pressable
-            onPress={openPicker}
-            style={[
-              styles.dateButton,
-              {
-                backgroundColor: colors.surface,
-                borderRadius: radius.sm,
-                borderColor: deadlineError ? colors.danger : colors.border,
-              },
-            ]}
-          >
-            <Text style={{ color: deadline ? colors.text : colors.textMuted }}>
-              {deadline ? formatDate(deadline.toISOString()) : 'Tarih seç'}
-            </Text>
-          </Pressable>
-          {!!deadlineError && <Text style={[styles.error, { color: colors.danger }]}>{deadlineError}</Text>}
-          {Platform.OS === 'ios' && showIosPicker && (
-            <DateTimePicker
-              value={deadline ?? minDate}
-              mode="date"
-              display="inline"
-              minimumDate={minDate}
-              onChange={(_event, selected) => {
-                if (selected) {
-                  setDeadline(startOfDay(selected));
-                  setDeadlineError(null);
-                }
-              }}
-            />
-          )}
+          {kind === 'onetime' ? (
+            <>
+              <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>Bitiş Tarihi</Text>
+              <Pressable
+                onPress={openDatePicker}
+                style={[
+                  styles.dateButton,
+                  {
+                    backgroundColor: colors.surface,
+                    borderRadius: radius.sm,
+                    borderColor: deadlineError ? colors.danger : colors.border,
+                  },
+                ]}
+              >
+                <Text style={{ color: deadline ? colors.text : colors.textMuted }}>
+                  {deadline ? formatDate(deadline.toISOString()) : 'Tarih seç'}
+                </Text>
+              </Pressable>
+              {!!deadlineError && <Text style={[styles.error, { color: colors.danger }]}>{deadlineError}</Text>}
+              {Platform.OS === 'ios' && showIosDatePicker && (
+                <DateTimePicker
+                  value={deadline ?? minDate}
+                  mode="date"
+                  display="inline"
+                  minimumDate={minDate}
+                  onChange={(_event, selected) => {
+                    if (selected) {
+                      setDeadline(startOfDay(selected));
+                      setDeadlineError(null);
+                    }
+                  }}
+                />
+              )}
 
-          <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>
-            Kaç gün önce hatırlat?
-          </Text>
-          <View style={styles.stepperRow}>
-            <StepperButton label="−" onPress={() => adjustReminder(-1)} colors={colors} radius={radius} />
-            <Text style={[styles.stepperValue, { color: colors.text }]}>
-              {reminderDaysBefore === 0 ? 'Bitiş günü' : `${reminderDaysBefore} gün`}
-            </Text>
-            <StepperButton label="+" onPress={() => adjustReminder(1)} colors={colors} radius={radius} />
-          </View>
+              <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>
+                Kaç gün önce hatırlat?
+              </Text>
+              <View style={styles.stepperRow}>
+                <StepperButton label="−" onPress={() => adjustReminder(-1)} colors={colors} radius={radius} />
+                <Text style={[styles.stepperValue, { color: colors.text }]}>
+                  {reminderDaysBefore === 0 ? 'Bitiş günü' : `${reminderDaysBefore} gün`}
+                </Text>
+                <StepperButton label="+" onPress={() => adjustReminder(1)} colors={colors} radius={radius} />
+              </View>
+            </>
+          ) : (
+            <>
+              <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>
+                Her Gün Hatırlatma Saati
+              </Text>
+              <Pressable
+                onPress={openTimePicker}
+                style={[
+                  styles.dateButton,
+                  { backgroundColor: colors.surface, borderRadius: radius.sm, borderColor: colors.border },
+                ]}
+              >
+                <Text style={{ color: colors.text }}>{formatTimeOfDay(reminderTime)}</Text>
+              </Pressable>
+              {Platform.OS === 'ios' && showIosTimePicker && (
+                <DateTimePicker
+                  value={hhmmToDate(reminderTime)}
+                  mode="time"
+                  display="spinner"
+                  onChange={(_event, selected) => {
+                    if (selected) setReminderTime(timeToHHMM(selected));
+                  }}
+                />
+              )}
+              <Text style={[styles.hint, { color: colors.textMuted }]}>
+                Bitiş tarihi yok; bu hedef her gün belirtilen saatte hatırlatılır ve o gün tamamlandığında
+                seriye (streak) sayılır.
+              </Text>
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
+  );
+}
+
+function SegmentButton({
+  label,
+  active,
+  onPress,
+  colors,
+  radius,
+}: {
+  label: string;
+  active: boolean;
+  onPress: () => void;
+  colors: ReturnType<typeof useAppTheme>['colors'];
+  radius: ReturnType<typeof useAppTheme>['radius'];
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.segmentButton,
+        { borderRadius: radius.pill, backgroundColor: active ? colors.surface : 'transparent' },
+      ]}
+    >
+      <Text style={[styles.segmentText, { color: active ? colors.text : colors.textMuted }]}>{label}</Text>
+    </Pressable>
   );
 }
 
@@ -266,6 +381,24 @@ const styles = StyleSheet.create({
   headerAction: {
     fontSize: 15,
   },
+  segmented: {
+    flexDirection: 'row',
+    padding: 4,
+    marginBottom: 20,
+  },
+  segmentButton: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  segmentText: {
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  kindLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
   label: {
     fontSize: 13,
     fontWeight: '600',
@@ -289,6 +422,11 @@ const styles = StyleSheet.create({
   error: {
     fontSize: 12,
     marginTop: 4,
+  },
+  hint: {
+    fontSize: 12,
+    marginTop: 10,
+    lineHeight: 17,
   },
   stepperRow: {
     flexDirection: 'row',

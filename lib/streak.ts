@@ -15,14 +15,22 @@ function diffInDays(a: Date, b: Date): number {
  * Recomputing rather than incrementing keeps undo, multi-completion-per-day and
  * app-restart scenarios correct without extra bookkeeping.
  */
+function completionDayKeys(goals: Goal[]): string[] {
+  const keys: string[] = [];
+  for (const goal of goals) {
+    if (goal.kind === 'onetime') {
+      if (goal.status === 'completed' && goal.completedAt) {
+        keys.push(dayKey(new Date(goal.completedAt)));
+      }
+    } else {
+      keys.push(...goal.completedDates);
+    }
+  }
+  return keys;
+}
+
 export function computeStreak(goals: Goal[]): StreakData {
-  const dayKeys = Array.from(
-    new Set(
-      goals
-        .filter((g) => g.status === 'completed' && g.completedAt)
-        .map((g) => dayKey(new Date(g.completedAt as string)))
-    )
-  ).sort();
+  const dayKeys = Array.from(new Set(completionDayKeys(goals))).sort();
 
   if (dayKeys.length === 0) {
     return { currentStreak: 0, bestStreak: 0, lastCompletionDate: null };
