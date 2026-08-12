@@ -70,6 +70,27 @@ export type RecurringGoal = BaseGoal & {
 
 export type Goal = OneTimeGoal | RecurringGoal;
 
+/** Lightweight checklist item — deliberately separate from Goal: no deadline, no streak impact. */
+export type TodoItem = {
+  id: string;
+  title: string;
+  done: boolean;
+  createdAt: string;
+  /** Optional yyyy-mm-dd the task is pencilled in for */
+  dueDate?: string;
+};
+
+export type CalendarEvent = {
+  id: string;
+  title: string;
+  /** yyyy-mm-dd */
+  date: string;
+  /** "HH:mm" local time, or undefined for an all-day entry */
+  time?: string;
+  note?: string;
+  notificationIds: string[];
+};
+
 export type StreakData = {
   currentStreak: number;
   bestStreak: number;

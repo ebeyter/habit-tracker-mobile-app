@@ -13,6 +13,7 @@ export default function TabsLayout() {
         tabBarActiveTintColor: colors.tint,
         tabBarInactiveTintColor: colors.tabIconDefault,
         tabBarStyle: { backgroundColor: colors.surface, borderTopColor: colors.border },
+        tabBarLabelStyle: { fontSize: 10 },
       }}
     >
       <Tabs.Screen
@@ -26,7 +27,21 @@ export default function TabsLayout() {
         name="day"
         options={{
           title: 'Gün Gün',
+          tabBarIcon: ({ color, size }) => <Ionicons name="today" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="calendar"
+        options={{
+          title: 'Takvim',
           tabBarIcon: ({ color, size }) => <Ionicons name="calendar" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="todos"
+        options={{
+          title: 'Yapılacak',
+          tabBarIcon: ({ color, size }) => <Ionicons name="checkbox-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen

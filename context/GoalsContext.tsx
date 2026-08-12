@@ -9,13 +9,15 @@ import {
   configureNotificationHandler,
   getPermissionStatus,
   rescheduleGoalReminder,
+  scheduleEventReminder,
   scheduleGoalReminder,
   type PermissionStatus,
   type ScheduleResult,
 } from '@/lib/notifications';
+import { getEvents, getTodos, saveEvents, saveTodos } from '@/lib/planner-storage';
 import { getGoals, getStreak, saveGoals, saveStreak } from '@/lib/storage';
 import { computeStreak } from '@/lib/streak';
-import type { Category, Goal, NewGoalInput, StreakData } from '@/lib/types';
+import type { CalendarEvent, Category, Goal, NewGoalInput, StreakData, TodoItem } from '@/lib/types';
 
 type SaveOutcome = { goal: Goal; scheduleReason: ScheduleResult['reason'] };
 
@@ -35,6 +37,14 @@ type GoalsContextValue = {
   categories: Category[];
   addCategory: (label: string, emoji: string) => Promise<Category>;
   deleteCategory: (id: string) => Promise<void>;
+  todos: TodoItem[];
+  addTodo: (title: string, dueDate?: string) => Promise<void>;
+  toggleTodo: (id: string) => Promise<void>;
+  deleteTodo: (id: string) => Promise<void>;
+  clearDoneTodos: () => Promise<void>;
+  events: CalendarEvent[];
+  addEvent: (input: { title: string; date: string; time?: string; note?: string }) => Promise<void>;
+  deleteEvent: (id: string) => Promise<void>;
   refreshPermission: () => Promise<void>;
 };
 
@@ -49,6 +59,8 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
   });
   const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>('undetermined');
   const [customCategories, setCustomCategories] = useState<Category[]>([]);
+  const [todos, setTodos] = useState<TodoItem[]>([]);
+  const [events, setEvents] = useState<CalendarEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
   const goalsRef = useRef<Goal[]>([]);
@@ -59,16 +71,21 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     configureNotificationHandler();
     (async () => {
-      const [loadedGoals, status, cachedStreak, loadedCategories] = await Promise.all([
-        getGoals(),
-        getPermissionStatus(),
-        getStreak(),
-        getCustomCategories(),
-      ]);
+      const [loadedGoals, status, cachedStreak, loadedCategories, loadedTodos, loadedEvents] =
+        await Promise.all([
+          getGoals(),
+          getPermissionStatus(),
+          getStreak(),
+          getCustomCategories(),
+          getTodos(),
+          getEvents(),
+        ]);
       goalsRef.current = loadedGoals;
       setGoals(loadedGoals);
       setPermissionStatus(status);
       setCustomCategories(loadedCategories);
+      setTodos(loadedTodos);
+      setEvents(loadedEvents);
       // Recompute from goals as the source of truth; falls back to cached value only if goals are empty.
       const freshStreak = computeStreak(loadedGoals);
       setStreak(loadedGoals.length ? freshStreak : cachedStreak ?? freshStreak);
@@ -270,6 +287,52 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function commitTodos(next: TodoItem[]) {
+    setTodos(next);
+    await saveTodos(next);
+  }
+
+  async function addTodo(title: string, dueDate?: string) {
+    const todo: TodoItem = {
+      id: generateId(),
+      title: title.trim(),
+      done: false,
+      createdAt: new Date().toISOString(),
+      dueDate,
+    };
+    await commitTodos([...todos, todo]);
+  }
+
+  async function toggleTodo(id: string) {
+    await commitTodos(todos.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
+  }
+
+  async function deleteTodo(id: string) {
+    await commitTodos(todos.filter((t) => t.id !== id));
+  }
+
+  async function clearDoneTodos() {
+    await commitTodos(todos.filter((t) => !t.done));
+  }
+
+  async function commitEvents(next: CalendarEvent[]) {
+    setEvents(next);
+    await saveEvents(next);
+  }
+
+  async function addEvent(input: { title: string; date: string; time?: string; note?: string }) {
+    const { notificationIds } = await scheduleEventReminder(input.title, input.date, input.time);
+    setPermissionStatus(await getPermissionStatus());
+    const event: CalendarEvent = { id: generateId(), ...input, notificationIds };
+    await commitEvents([...events, event]);
+  }
+
+  async function deleteEvent(id: string) {
+    const existing = events.find((e) => e.id === id);
+    await cancelGoalReminders(existing?.notificationIds);
+    await commitEvents(events.filter((e) => e.id !== id));
+  }
+
   async function refreshPermission() {
     setPermissionStatus(await getPermissionStatus());
   }
@@ -291,10 +354,18 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
       categories: allCategories(customCategories),
       addCategory,
       deleteCategory,
+      todos,
+      addTodo,
+      toggleTodo,
+      deleteTodo,
+      clearDoneTodos,
+      events,
+      addEvent,
+      deleteEvent,
       refreshPermission,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [goals, streak, permissionStatus, loading, customCategories]
+    [goals, streak, permissionStatus, loading, customCategories, todos, events]
   );
 
   return <GoalsContext.Provider value={value}>{children}</GoalsContext.Provider>;

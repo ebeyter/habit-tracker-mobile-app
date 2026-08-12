@@ -167,6 +167,28 @@ export async function scheduleGoalReminder(goal: NewGoalInput): Promise<Schedule
   return goal.kind === 'onetime' ? scheduleOneTimeReminder(goal) : scheduleRecurringReminder(goal);
 }
 
+export async function scheduleEventReminder(
+  title: string,
+  date: string,
+  time?: string
+): Promise<ScheduleResult> {
+  if (!time) return { notificationIds: [], reason: null };
+
+  const [y, m, d] = date.split('-').map(Number);
+  const [hour, minute] = time.split(':').map(Number);
+  const when = new Date(y, m - 1, d, hour, minute, 0, 0);
+  if (when.getTime() <= Date.now()) return { notificationIds: [], reason: 'past' };
+
+  const status = await ensurePermission();
+  if (status !== 'granted') return { notificationIds: [], reason: 'permission' };
+
+  const id = await Notifications.scheduleNotificationAsync({
+    content: { title: 'Takvim hatırlatması', body: title },
+    trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date: when },
+  });
+  return { notificationIds: [id], reason: null };
+}
+
 export async function cancelGoalReminders(notificationIds: string[] = []): Promise<void> {
   for (const id of notificationIds) {
     try {
