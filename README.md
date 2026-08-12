@@ -2,6 +2,18 @@
 
 Exposure AI Academy · Project 9 — React Native + Expo + Local Notifications ile geliştirilmiş, backend gerektirmeyen, local-first bir habit tracker mobil uygulaması.
 
+## Teslim
+
+| | |
+|---|---|
+| GitHub | https://github.com/ebeyter/habit-tracker-mobile-app |
+| Android preview APK | [İndir](https://expo.dev/artifacts/eas/KquTshw6j0d8PuI6V1jb13y8mvTrmKQ0NkqBoHpBCIE.apk) · [build sayfası](https://expo.dev/accounts/ebeyter/projects/my-apphabittracker/builds/bf6c48f3-150c-4c0a-a4a6-d4e2d259fabb) |
+| iOS | Expo Go demo (`npx expo start --tunnel` → QR) |
+
+> iOS için ayrı bir build yok: ad-hoc dağıtım ücretli Apple Developer üyeliği gerektiriyor. Brief bu
+> durumda Expo Go demosunu kabul ediyor ve local notification'lar Expo Go içinde çalışıyor
+> (Expo Go'dan kaldırılan yalnızca *remote push*, bu proje onu kullanmıyor).
+
 ## Özellikler
 
 ### Brief kapsamındaki çekirdek akış
