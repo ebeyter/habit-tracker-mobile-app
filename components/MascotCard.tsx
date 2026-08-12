@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, type ImageSourcePropType, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 
 import { useAppTheme } from '@/hooks/use-app-theme';
 import {
@@ -20,10 +20,12 @@ function moodFor(streak: StreakData): Mood {
   return 'neutral';
 }
 
-// Emoji stand-in for now — swap the fox glyph below for an <Image> per (color, outfit)
-// combo once the fal.ai-generated mascot artwork is available (see scripts/generate-mascot-art.mjs).
-const MOOD_FACE: Record<Mood, string> = { happy: '🦊', sad: '🦊', neutral: '🦊' };
-const MOOD_ACCENT: Record<Mood, string> = { happy: '✨', sad: '💧', neutral: '' };
+// Generated via scripts/generate-mascot-art.mjs (fal.ai, dev-time only — not called at runtime).
+const MOOD_IMAGE: Record<Mood, ImageSourcePropType> = {
+  neutral: require('@/assets/mascot/neutral.png'),
+  happy: require('@/assets/mascot/happy.png'),
+  sad: require('@/assets/mascot/sad.png'),
+};
 
 const MOOD_MESSAGE: Record<Mood, (name: string, streak: StreakData) => string> = {
   happy: (name, streak) => `${name}: ${streak.currentStreak} gündür ara vermiyorsun, harikasın! 🔥`,
@@ -72,11 +74,10 @@ export function MascotCard({ streak }: { streak: StreakData }) {
       <View style={styles.row}>
         <Pressable
           onPress={() => setCustomizing((v) => !v)}
-          style={[styles.avatar, { backgroundColor: mascotColor.hex }]}
+          style={[styles.avatar, { borderColor: mascotColor.hex }]}
         >
-          <Text style={styles.emoji}>{MOOD_FACE[mood]}</Text>
+          <Image source={MOOD_IMAGE[mood]} style={styles.avatarImage} resizeMode="contain" />
           {!!outfit.emoji && <Text style={styles.outfitBadge}>{outfit.emoji}</Text>}
-          {!!MOOD_ACCENT[mood] && <Text style={styles.moodBadge}>{MOOD_ACCENT[mood]}</Text>}
         </Pressable>
 
         <View style={styles.textCol}>
@@ -171,26 +172,24 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   avatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    borderWidth: 3,
+    backgroundColor: '#fff',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
-  emoji: {
-    fontSize: 30,
+  avatarImage: {
+    width: '100%',
+    height: '100%',
   },
   outfitBadge: {
     position: 'absolute',
     top: -6,
     right: -6,
     fontSize: 18,
-  },
-  moodBadge: {
-    position: 'absolute',
-    bottom: -4,
-    right: -4,
-    fontSize: 14,
   },
   textCol: {
     flex: 1,
