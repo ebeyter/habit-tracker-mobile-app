@@ -4,58 +4,68 @@ import { ProgressRing } from '@/components/ProgressRing';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import type { StreakData } from '@/lib/types';
 
+/** Compact vitality strip — kept small so the garden itself stays the hero of the screen. */
 export function StreakHeader({ streak }: { streak: StreakData }) {
   const { colors, spacing, radius } = useAppTheme();
 
   // The current streak is drawn as a share of the personal best, so the ring fills
   // as the user approaches their record (and sits full once they match it).
   const target = Math.max(streak.bestStreak, 1);
-  const progress = streak.currentStreak / target;
 
   const subtitle =
     streak.currentStreak === 0
-      ? 'Bugün bir hedef tamamla ve seriyi başlat'
+      ? 'Bugün bir bitkini sula, seri başlasın'
       : streak.currentStreak >= streak.bestStreak
-        ? 'Rekordasın — böyle devam! 🏆'
+        ? 'Rekordasın — bahçen hiç bu kadar canlı olmamıştı 🏆'
         : `Rekoruna ${streak.bestStreak - streak.currentStreak} gün kaldı`;
 
   return (
     <View
       style={[
         styles.container,
-        { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.lg },
+        { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md },
       ]}
     >
-      <View style={styles.row}>
-        <ProgressRing
-          progress={progress}
-          color={colors.streak}
-          value={String(streak.currentStreak)}
-          label="Güncel Seri 🔥"
-        />
-        <ProgressRing
-          progress={streak.bestStreak > 0 ? 1 : 0}
-          color={colors.tint}
-          value={String(streak.bestStreak)}
-          label="En İyi Seri 🏆"
-        />
+      <ProgressRing
+        progress={streak.currentStreak / target}
+        size={66}
+        stroke={7}
+        color={colors.streak}
+        value={String(streak.currentStreak)}
+        label="Seri 🔥"
+      />
+      <View style={styles.textCol}>
+        <Text style={[styles.headline, { color: colors.text }]}>
+          {streak.currentStreak} günlük seri
+        </Text>
+        <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text>
+        <Text style={[styles.best, { color: colors.tint }]}>En iyi: {streak.bestStreak} gün 🏆</Text>
       </View>
-      <Text style={[styles.subtitle, { color: colors.textMuted }]}>{subtitle}</Text>
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    gap: 14,
-  },
-  row: {
     flexDirection: 'row',
-    justifyContent: 'space-evenly',
     alignItems: 'center',
+    gap: 16,
+  },
+  textCol: {
+    flex: 1,
+    gap: 2,
+  },
+  headline: {
+    fontSize: 16,
+    fontWeight: '800',
   },
   subtitle: {
     fontSize: 12,
-    textAlign: 'center',
+    lineHeight: 17,
+  },
+  best: {
+    fontSize: 12,
+    fontWeight: '700',
+    marginTop: 2,
   },
 });

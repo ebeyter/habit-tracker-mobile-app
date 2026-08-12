@@ -5,19 +5,17 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
-import { GoalCard } from '@/components/GoalCard';
-import { MascotCard } from '@/components/MascotCard';
 import { PermissionBanner } from '@/components/PermissionBanner';
-import { SectionHeader } from '@/components/SectionHeader';
+import { PlantTile } from '@/components/PlantTile';
 import { StreakHeader } from '@/components/StreakHeader';
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
-import { isPastDay } from '@/lib/date';
-import type { Goal, GoalCategory, OneTimeGoal, RecurringGoal } from '@/lib/types';
+import { gardenSummary, identityLine, plantStateFor } from '@/lib/garden';
+import type { Goal, GoalCategory } from '@/lib/types';
 
 type CategoryFilter = GoalCategory | 'all';
 
-export default function GoalsScreen() {
+export default function GardenScreen() {
   const { colors, spacing, radius } = useAppTheme();
   const {
     goals,
@@ -25,9 +23,7 @@ export default function GoalsScreen() {
     permissionStatus,
     loading,
     completeGoal,
-    undoComplete,
     toggleRecurringToday,
-    toggleSubtask,
     deleteGoal,
     categories,
   } = useGoals();
@@ -39,37 +35,28 @@ export default function GoalsScreen() {
     [goals, categoryFilter]
   );
 
-  const sections = useMemo(() => {
-    const recurring: RecurringGoal[] = [];
-    const overdue: OneTimeGoal[] = [];
-    const active: OneTimeGoal[] = [];
-    const completed: OneTimeGoal[] = [];
+  const summary = useMemo(() => gardenSummary(goals), [goals]);
 
-    for (const goal of filteredGoals) {
-      if (goal.kind === 'recurring') {
-        recurring.push(goal);
-      } else if (goal.status === 'completed') {
-        completed.push(goal);
-      } else if (isPastDay(new Date(goal.deadline))) {
-        overdue.push(goal);
-      } else {
-        active.push(goal);
-      }
-    }
+  const needsWater = useMemo(
+    () =>
+      filteredGoals.filter((g) => {
+        const s = plantStateFor(g);
+        return s.dueToday && !s.doneToday;
+      }),
+    [filteredGoals]
+  );
 
-    const byDeadline = (a: OneTimeGoal, b: OneTimeGoal) => a.deadline.localeCompare(b.deadline);
-    overdue.sort(byDeadline);
-    active.sort(byDeadline);
-    completed.sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));
-    recurring.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+  /** Tapping a plant waters it: completes today for a habit, finishes a one-time goal. */
+  function water(goal: Goal) {
+    if (goal.kind === 'recurring') toggleRecurringToday(goal.id);
+    else if (goal.status === 'active') completeGoal(goal.id);
+  }
 
-    return { recurring, overdue, active, completed };
-  }, [filteredGoals]);
-
-  function confirmDelete(goal: Goal) {
-    Alert.alert('Hedefi sil', `"${goal.title}" silinsin mi?`, [
-      { text: 'Vazgeç', style: 'cancel' },
+  function openActions(goal: Goal) {
+    Alert.alert(goal.title, identityLine(goal), [
+      { text: 'Düzenle', onPress: () => router.push({ pathname: '/goal-form', params: { id: goal.id } }) },
       { text: 'Sil', style: 'destructive', onPress: () => deleteGoal(goal.id) },
+      { text: 'Kapat', style: 'cancel' },
     ]);
   }
 
@@ -84,12 +71,18 @@ export default function GoalsScreen() {
   }
 
   const hasGoals = goals.length > 0;
-  const hasFilteredGoals = filteredGoals.length > 0;
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={[styles.header, { paddingHorizontal: spacing.lg, paddingTop: spacing.md }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Hedeflerim</Text>
+        <View>
+          <Text style={[styles.title, { color: colors.text }]}>Bahçem</Text>
+          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
+            {hasGoals
+              ? `${summary.total} bitki · ${summary.thriving} serpiliyor${summary.wilting ? ` · ${summary.wilting} solmuş` : ''}`
+              : 'Kim olmak istediğini ek, birlikte büyütelim'}
+          </Text>
+        </View>
         <Pressable onPress={() => router.push('/settings')} hitSlop={12}>
           <Ionicons name="settings-outline" size={24} color={colors.textMuted} />
         </Pressable>
@@ -100,11 +93,7 @@ export default function GoalsScreen() {
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl * 2 }}
         showsVerticalScrollIndicator={false}
       >
-        <MascotCard streak={streak} />
-
-        <View style={{ marginTop: spacing.md }}>
-          <StreakHeader streak={streak} />
-        </View>
+        <StreakHeader streak={streak} />
 
         {permissionStatus === 'denied' && (
           <View style={{ marginTop: spacing.md }}>
@@ -112,105 +101,63 @@ export default function GoalsScreen() {
           </View>
         )}
 
-        {hasGoals && (
-          <View style={[styles.chipRow, { marginTop: spacing.md }]}>
-            <CategoryChip
-              label="Tümü"
-              emoji="✨"
-              active={categoryFilter === 'all'}
-              onPress={() => setCategoryFilter('all')}
-            />
-            {categories.map((c) => (
-              <CategoryChip
-                key={c.id}
-                label={c.label}
-                emoji={c.emoji}
-                active={categoryFilter === c.id}
-                onPress={() => setCategoryFilter(c.id)}
-              />
-            ))}
-          </View>
-        )}
-
         {!hasGoals ? (
           <EmptyState onCreate={() => router.push('/goal-form')} />
-        ) : !hasFilteredGoals ? (
-          <Text style={[styles.sectionEmpty, { color: colors.textMuted, marginTop: spacing.lg }]}>
-            Bu kategoride hedef yok.
-          </Text>
         ) : (
           <>
-            {sections.recurring.length > 0 && (
-              <>
-                <SectionHeader title="Tekrarlayan Alışkanlıklar" count={sections.recurring.length} />
-                {sections.recurring.map((goal) => (
-                  <GoalCard
-                    key={goal.id}
-                    goal={goal}
-                    onComplete={() => {}}
-                    onUndo={() => {}}
-                    onToggleToday={() => toggleRecurringToday(goal.id)}
-                    onToggleSubtask={(sid) => toggleSubtask(goal.id, sid)}
-                    onEdit={() => router.push({ pathname: '/goal-form', params: { id: goal.id } })}
-                    onDelete={() => confirmDelete(goal)}
-                  />
-                ))}
-              </>
+            {needsWater.length > 0 && (
+              <View
+                style={[
+                  styles.waterBanner,
+                  { backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md },
+                ]}
+              >
+                <Text style={styles.waterEmoji}>💧</Text>
+                <Text style={[styles.waterText, { color: colors.text }]}>
+                  {needsWater.length} bitki bugün su bekliyor — üzerine dokunarak sula.
+                </Text>
+              </View>
             )}
 
-            {sections.overdue.length > 0 && (
-              <>
-                <SectionHeader title="Gecikti" count={sections.overdue.length} />
-                {sections.overdue.map((goal) => (
-                  <GoalCard
-                    key={goal.id}
-                    goal={goal}
-                    onComplete={() => completeGoal(goal.id)}
-                    onUndo={() => undoComplete(goal.id)}
-                    onToggleToday={() => {}}
-                  onToggleSubtask={(sid) => toggleSubtask(goal.id, sid)}
-                    onEdit={() => router.push({ pathname: '/goal-form', params: { id: goal.id } })}
-                    onDelete={() => confirmDelete(goal)}
-                  />
-                ))}
-              </>
-            )}
-
-            <SectionHeader title="Aktif" count={sections.active.length} />
-            {sections.active.length === 0 ? (
-              <Text style={[styles.sectionEmpty, { color: colors.textMuted }]}>Aktif hedef yok.</Text>
-            ) : (
-              sections.active.map((goal) => (
-                <GoalCard
-                  key={goal.id}
-                  goal={goal}
-                  onComplete={() => completeGoal(goal.id)}
-                  onUndo={() => undoComplete(goal.id)}
-                  onToggleToday={() => {}}
-                  onToggleSubtask={(sid) => toggleSubtask(goal.id, sid)}
-                  onEdit={() => router.push({ pathname: '/goal-form', params: { id: goal.id } })}
-                  onDelete={() => confirmDelete(goal)}
+            <View style={[styles.chipRow, { marginTop: spacing.md }]}>
+              <CategoryChip
+                label="Tümü"
+                emoji="✨"
+                active={categoryFilter === 'all'}
+                onPress={() => setCategoryFilter('all')}
+              />
+              {categories.map((c) => (
+                <CategoryChip
+                  key={c.id}
+                  label={c.label}
+                  emoji={c.emoji}
+                  active={categoryFilter === c.id}
+                  onPress={() => setCategoryFilter(c.id)}
                 />
-              ))
+              ))}
+            </View>
+
+            {filteredGoals.length === 0 ? (
+              <Text style={[styles.empty, { color: colors.textMuted, marginTop: spacing.lg }]}>
+                Bu kategoride bitki yok.
+              </Text>
+            ) : (
+              <View style={[styles.grid, { marginTop: spacing.md }]}>
+                {filteredGoals.map((goal) => (
+                  <View key={goal.id} style={styles.gridCell}>
+                    <PlantTile
+                      goal={goal}
+                      onPress={() => water(goal)}
+                      onLongPress={() => openActions(goal)}
+                    />
+                  </View>
+                ))}
+              </View>
             )}
 
-            {sections.completed.length > 0 && (
-              <>
-                <SectionHeader title="Tamamlandı" count={sections.completed.length} />
-                {sections.completed.map((goal) => (
-                  <GoalCard
-                    key={goal.id}
-                    goal={goal}
-                    onComplete={() => completeGoal(goal.id)}
-                    onUndo={() => undoComplete(goal.id)}
-                    onToggleToday={() => {}}
-                  onToggleSubtask={(sid) => toggleSubtask(goal.id, sid)}
-                    onEdit={() => router.push({ pathname: '/goal-form', params: { id: goal.id } })}
-                    onDelete={() => confirmDelete(goal)}
-                  />
-                ))}
-              </>
-            )}
+            <Text style={[styles.tip, { color: colors.textMuted }]}>
+              Sulamak için dokun · Düzenlemek için basılı tut
+            </Text>
           </>
         )}
       </ScrollView>
@@ -229,7 +176,7 @@ export default function GoalsScreen() {
             },
           ]}
         >
-          <Text style={styles.fabText}>+</Text>
+          <Ionicons name="add" size={30} color="#fff" />
         </Pressable>
       )}
     </SafeAreaView>
@@ -268,7 +215,7 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     paddingBottom: 4,
   },
@@ -276,9 +223,22 @@ const styles = StyleSheet.create({
     fontSize: 28,
     fontWeight: '800',
   },
-  sectionEmpty: {
+  subtitle: {
     fontSize: 13,
-    marginBottom: 8,
+    marginTop: 2,
+  },
+  waterBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  waterEmoji: {
+    fontSize: 20,
+  },
+  waterText: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
   },
   chipRow: {
     flexDirection: 'row',
@@ -293,22 +253,32 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
+  grid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+  },
+  gridCell: {
+    width: '48%',
+  },
+  empty: {
+    fontSize: 13,
+  },
+  tip: {
+    fontSize: 11,
+    textAlign: 'center',
+    marginTop: 20,
+  },
   fab: {
     position: 'absolute',
-    width: 56,
-    height: 56,
+    width: 60,
+    height: 60,
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-  },
-  fabText: {
-    color: '#fff',
-    fontSize: 28,
-    fontWeight: '600',
-    marginTop: -2,
+    shadowOpacity: 0.3,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 5 },
+    elevation: 8,
   },
 });
