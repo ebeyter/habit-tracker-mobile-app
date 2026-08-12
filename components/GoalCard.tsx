@@ -2,8 +2,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { dayKey, daysUntil, formatDate, formatTimeOfDay, isPastDay } from '@/lib/date';
+import { describeRecurrence, isDueOn } from '@/lib/recurrence';
 import { suggestPlan } from '@/lib/smart-plan';
-import { CATEGORIES, type Goal } from '@/lib/types';
+import { CATEGORIES, PRIORITIES, type Goal } from '@/lib/types';
 
 function categoryEmoji(id: Goal['category']): string {
   return CATEGORIES.find((c) => c.id === id)?.emoji ?? '🎯';
@@ -14,18 +15,57 @@ type Props = {
   onComplete: () => void;
   onUndo: () => void;
   onToggleToday: () => void;
+  onToggleSubtask: (subtaskId: string) => void;
   onEdit: () => void;
   onDelete: () => void;
 };
 
-export function GoalCard({ goal, onComplete, onUndo, onToggleToday, onEdit, onDelete }: Props) {
+export function GoalCard({
+  goal,
+  onComplete,
+  onUndo,
+  onToggleToday,
+  onToggleSubtask,
+  onEdit,
+  onDelete,
+}: Props) {
   const { colors, spacing, radius } = useAppTheme();
+
+  const prioritySymbol =
+    goal.priority === 'normal' ? null : PRIORITIES.find((p) => p.id === goal.priority)?.symbol;
+
+  const subtaskSection =
+    goal.subtasks.length > 0 ? (
+      <View style={styles.subtasks}>
+        {goal.subtasks.map((s) => (
+          <Pressable key={s.id} onPress={() => onToggleSubtask(s.id)} style={styles.subtaskRow}>
+            <Text style={{ color: s.done ? colors.success : colors.textMuted, fontSize: 13 }}>
+              {s.done ? '☑' : '☐'}
+            </Text>
+            <Text
+              style={[
+                styles.subtaskText,
+                {
+                  color: s.done ? colors.textMuted : colors.text,
+                  textDecorationLine: s.done ? 'line-through' : 'none',
+                },
+              ]}
+            >
+              {s.title}
+            </Text>
+          </Pressable>
+        ))}
+      </View>
+    ) : null;
 
   if (goal.kind === 'recurring') {
     const doneToday = goal.completedDates.includes(dayKey(new Date()));
-    const badge = doneToday
-      ? { label: 'Bugün tamamlandı', bg: colors.successMuted, fg: colors.success }
-      : { label: 'Bugün bekliyor', bg: colors.warningMuted, fg: colors.warning };
+    const dueToday = isDueOn(goal, new Date());
+    const badge = !dueToday
+      ? { label: 'Bugün planlı değil', bg: colors.border, fg: colors.textMuted }
+      : doneToday
+        ? { label: 'Bugün tamamlandı', bg: colors.successMuted, fg: colors.success }
+        : { label: 'Bugün bekliyor', bg: colors.warningMuted, fg: colors.warning };
 
     return (
       <View
@@ -37,6 +77,7 @@ export function GoalCard({ goal, onComplete, onUndo, onToggleToday, onEdit, onDe
         <View style={styles.headerRow}>
           <Text style={[styles.title, { color: colors.text }]}>
             {categoryEmoji(goal.category)} {goal.title}
+            {prioritySymbol ? <Text style={{ color: colors.danger }}> {prioritySymbol}</Text> : null}
           </Text>
           <View style={[styles.badge, { backgroundColor: badge.bg }]}>
             <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.label}</Text>
@@ -50,9 +91,12 @@ export function GoalCard({ goal, onComplete, onUndo, onToggleToday, onEdit, onDe
         )}
 
         <Text style={[styles.meta, { color: colors.textMuted }]}>
-          Her gün {formatTimeOfDay(goal.reminderTime)} · {goal.completedDates.length} kez tamamlandı
-          {goal.notificationId === null ? ' · bildirim yok' : ''}
+          {describeRecurrence(goal.recurrence)} · {formatTimeOfDay(goal.reminderTime)} ·{' '}
+          {goal.completedDates.length} kez tamamlandı
+          {goal.notificationIds.length === 0 ? ' · bildirim yok' : ''}
         </Text>
+
+        {subtaskSection}
 
         <View style={[styles.actions, { gap: spacing.sm }]}>
           <ActionButton
@@ -100,6 +144,7 @@ export function GoalCard({ goal, onComplete, onUndo, onToggleToday, onEdit, onDe
           ]}
         >
           {categoryEmoji(goal.category)} {goal.title}
+          {prioritySymbol ? <Text style={{ color: colors.danger }}> {prioritySymbol}</Text> : null}
         </Text>
         <View style={[styles.badge, { backgroundColor: badge.bg }]}>
           <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.label}</Text>
@@ -114,7 +159,7 @@ export function GoalCard({ goal, onComplete, onUndo, onToggleToday, onEdit, onDe
 
       <Text style={[styles.meta, { color: colors.textMuted }]}>
         Bitiş: {formatDate(goal.deadline)} · Hatırlatma: {goal.reminderDaysBefore === 0 ? 'aynı gün' : `${goal.reminderDaysBefore} gün önce`}
-        {goal.notificationId === null && goal.status === 'active' ? ' · bildirim yok' : ''}
+        {goal.notificationIds.length === 0 && goal.status === 'active' ? ' · bildirim yok' : ''}
       </Text>
 
       {goal.status === 'active' && (
@@ -122,6 +167,8 @@ export function GoalCard({ goal, onComplete, onUndo, onToggleToday, onEdit, onDe
           💡 {suggestPlan(goal.deadline, goal.targetAmount, goal.targetUnit)}
         </Text>
       )}
+
+      {subtaskSection}
 
       <View style={[styles.actions, { gap: spacing.sm }]}>
         {goal.status === 'active' ? (
@@ -194,6 +241,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     marginTop: 6,
+  },
+  subtasks: {
+    marginTop: 8,
+    gap: 6,
+  },
+  subtaskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  subtaskText: {
+    flex: 1,
+    fontSize: 13,
   },
   actions: {
     flexDirection: 'row',

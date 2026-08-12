@@ -1,6 +1,7 @@
 export type GoalStatus = 'active' | 'completed';
 export type GoalKind = 'onetime' | 'recurring';
 export type GoalCategory = 'genel' | 'saglik' | 'egitim' | 'is' | 'kisisel';
+export type Priority = 'low' | 'normal' | 'high';
 
 export const CATEGORIES: { id: GoalCategory; label: string; emoji: string }[] = [
   { id: 'genel', label: 'Genel', emoji: '🎯' },
@@ -10,14 +11,36 @@ export const CATEGORIES: { id: GoalCategory; label: string; emoji: string }[] = 
   { id: 'kisisel', label: 'Kişisel', emoji: '🌱' },
 ];
 
+export const PRIORITIES: { id: Priority; label: string; symbol: string }[] = [
+  { id: 'low', label: 'Düşük', symbol: '!' },
+  { id: 'normal', label: 'Orta', symbol: '!!' },
+  { id: 'high', label: 'Yüksek', symbol: '!!!' },
+];
+
+/** 0 = Sunday … 6 = Saturday, matching Date#getDay */
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export type Recurrence =
+  | { type: 'daily' }
+  | { type: 'weekdays'; days: Weekday[] }
+  | { type: 'everyN'; n: number };
+
+export type Subtask = {
+  id: string;
+  title: string;
+  done: boolean;
+};
+
 type BaseGoal = {
   id: string;
   title: string;
   description?: string;
   category: GoalCategory;
+  priority: Priority;
+  subtasks: Subtask[];
   createdAt: string;
-  /** expo-notifications identifier; null if not scheduled (permission denied or, for one-time goals, reminder time already passed) */
-  notificationId?: string | null;
+  /** expo-notifications identifiers; empty when nothing is scheduled (permission denied, or reminder time already passed) */
+  notificationIds: string[];
 };
 
 export type OneTimeGoal = BaseGoal & {
@@ -35,7 +58,8 @@ export type OneTimeGoal = BaseGoal & {
 
 export type RecurringGoal = BaseGoal & {
   kind: 'recurring';
-  /** "HH:mm" local time the daily reminder fires at */
+  recurrence: Recurrence;
+  /** "HH:mm" local time the reminder fires at on due days */
   reminderTime: string;
   /** yyyy-mm-dd day keys on which this habit was marked done */
   completedDates: string[];
@@ -49,22 +73,25 @@ export type StreakData = {
   lastCompletionDate: string | null;
 };
 
-export type NewOneTimeGoalInput = {
-  kind: 'onetime';
+type NewGoalShared = {
   title: string;
   description?: string;
   category: GoalCategory;
+  priority: Priority;
+  subtasks: Subtask[];
+};
+
+export type NewOneTimeGoalInput = NewGoalShared & {
+  kind: 'onetime';
   deadline: string;
   reminderDaysBefore: number;
   targetAmount?: number;
   targetUnit?: string;
 };
 
-export type NewRecurringGoalInput = {
+export type NewRecurringGoalInput = NewGoalShared & {
   kind: 'recurring';
-  title: string;
-  description?: string;
-  category: GoalCategory;
+  recurrence: Recurrence;
   reminderTime: string;
 };
 

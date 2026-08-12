@@ -1,8 +1,12 @@
 import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
 
-import { addDays, startOfDay } from './date';
-import type { NewGoalInput } from './types';
+import { addDays, startOfDay, today } from './date';
+import { isDueOn } from './recurrence';
+import type { NewGoalInput, Recurrence } from './types';
+
+/** How many future occurrences to pre-schedule for "every N days" rules, which have no native repeating trigger. */
+const EVERY_N_HORIZON = 30;
 
 let handlerConfigured = false;
 
@@ -55,7 +59,7 @@ function oneTimeReminderDate(deadline: string, reminderDaysBefore: number): Date
 }
 
 export type ScheduleResult = {
-  notificationId: string | null;
+  notificationIds: string[];
   reason: 'past' | 'permission' | null;
 };
 
@@ -64,15 +68,15 @@ async function scheduleOneTimeReminder(
 ): Promise<ScheduleResult> {
   const when = oneTimeReminderDate(goal.deadline, goal.reminderDaysBefore);
   if (when.getTime() <= Date.now()) {
-    return { notificationId: null, reason: 'past' };
+    return { notificationIds: [], reason: 'past' };
   }
 
   const status = await ensurePermission();
   if (status !== 'granted') {
-    return { notificationId: null, reason: 'permission' };
+    return { notificationIds: [], reason: 'permission' };
   }
 
-  const notificationId = await Notifications.scheduleNotificationAsync({
+  const id = await Notifications.scheduleNotificationAsync({
     content: {
       title: 'Hedef hatırlatması',
       body:
@@ -86,50 +90,93 @@ async function scheduleOneTimeReminder(
     },
   });
 
-  return { notificationId, reason: null };
+  return { notificationIds: [id], reason: null };
 }
 
 async function scheduleRecurringReminder(
-  goal: Pick<Extract<NewGoalInput, { kind: 'recurring' }>, 'title' | 'reminderTime'>
+  goal: Pick<Extract<NewGoalInput, { kind: 'recurring' }>, 'title' | 'reminderTime' | 'recurrence'>
 ): Promise<ScheduleResult> {
   const status = await ensurePermission();
   if (status !== 'granted') {
-    return { notificationId: null, reason: 'permission' };
+    return { notificationIds: [], reason: 'permission' };
   }
 
   const [hour, minute] = goal.reminderTime.split(':').map(Number);
+  const content = {
+    title: 'Alışkanlık hatırlatması',
+    body: `"${goal.title}" için bugünü unutma!`,
+  };
 
-  const notificationId = await Notifications.scheduleNotificationAsync({
-    content: {
-      title: 'Günlük hatırlatma',
-      body: `"${goal.title}" için bugünü unutma!`,
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour,
-      minute,
-    },
-  });
+  const ids = await scheduleTriggersFor(goal.recurrence, content, hour, minute);
+  return { notificationIds: ids, reason: null };
+}
 
-  return { notificationId, reason: null };
+async function scheduleTriggersFor(
+  recurrence: Recurrence,
+  content: { title: string; body: string },
+  hour: number,
+  minute: number
+): Promise<string[]> {
+  if (recurrence.type === 'daily' || (recurrence.type === 'everyN' && recurrence.n === 1)) {
+    const id = await Notifications.scheduleNotificationAsync({
+      content,
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DAILY, hour, minute },
+    });
+    return [id];
+  }
+
+  if (recurrence.type === 'weekdays') {
+    const ids: string[] = [];
+    for (const day of recurrence.days) {
+      const id = await Notifications.scheduleNotificationAsync({
+        content,
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.WEEKLY,
+          // expo-notifications weekday is 1-based starting Sunday, Date#getDay is 0-based
+          weekday: day + 1,
+          hour,
+          minute,
+        },
+      });
+      ids.push(id);
+    }
+    return ids;
+  }
+
+  // "every N days" has no native repeating trigger — pre-schedule a horizon of one-off dates.
+  const ids: string[] = [];
+  const start = today();
+  for (let offset = 0; offset < EVERY_N_HORIZON; offset++) {
+    const date = addDays(start, offset);
+    if (!isDueOn({ recurrence, createdAt: start.toISOString() }, date)) continue;
+    date.setHours(hour, minute, 0, 0);
+    if (date.getTime() <= Date.now()) continue;
+    const id = await Notifications.scheduleNotificationAsync({
+      content,
+      trigger: { type: Notifications.SchedulableTriggerInputTypes.DATE, date },
+    });
+    ids.push(id);
+  }
+  return ids;
 }
 
 export async function scheduleGoalReminder(goal: NewGoalInput): Promise<ScheduleResult> {
   return goal.kind === 'onetime' ? scheduleOneTimeReminder(goal) : scheduleRecurringReminder(goal);
 }
 
-export async function cancelGoalReminder(notificationId?: string | null): Promise<void> {
-  if (!notificationId) return;
-  try {
-    await Notifications.cancelScheduledNotificationAsync(notificationId);
-  } catch {
-    // already fired or cancelled — safe to ignore
+export async function cancelGoalReminders(notificationIds: string[] = []): Promise<void> {
+  for (const id of notificationIds) {
+    try {
+      await Notifications.cancelScheduledNotificationAsync(id);
+    } catch {
+      // already fired or cancelled — safe to ignore
+    }
   }
 }
 
 export async function rescheduleGoalReminder(
-  goal: NewGoalInput & { notificationId?: string | null }
+  goal: NewGoalInput & { notificationIds?: string[] }
 ): Promise<ScheduleResult> {
-  await cancelGoalReminder(goal.notificationId);
+  await cancelGoalReminders(goal.notificationIds);
   return scheduleGoalReminder(goal);
 }

@@ -6,6 +6,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { addDays, dayKey, formatDayLabel, isSameDay, startOfDay, today } from '@/lib/date';
+import { isDueOn } from '@/lib/recurrence';
 import { CATEGORIES, type OneTimeGoal, type RecurringGoal } from '@/lib/types';
 
 function categoryEmoji(id: string): string {
@@ -26,8 +27,7 @@ export default function DayScreen() {
 
     for (const goal of goals) {
       if (goal.kind === 'recurring') {
-        // only show a habit on days at/after it was created
-        if (startOfDay(new Date(goal.createdAt)).getTime() <= startOfDay(selectedDate).getTime()) {
+        if (isDueOn(goal, selectedDate)) {
           habits.push(goal);
         }
       } else if (isSameDay(new Date(goal.deadline), selectedDate)) {

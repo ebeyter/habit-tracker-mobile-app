@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { dayKey } from '@/lib/date';
 import { generateId } from '@/lib/id';
 import {
-  cancelGoalReminder,
+  cancelGoalReminders,
   configureNotificationHandler,
   getPermissionStatus,
   rescheduleGoalReminder,
@@ -30,6 +30,7 @@ type GoalsContextValue = {
   undoComplete: (id: string) => Promise<void>;
   toggleRecurringToday: (id: string) => Promise<void>;
   toggleRecurringOnDate: (id: string, date: Date) => Promise<void>;
+  toggleSubtask: (goalId: string, subtaskId: string) => Promise<void>;
   refreshPermission: () => Promise<void>;
 };
 
@@ -79,7 +80,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
   }
 
   async function addGoal(input: NewGoalInput): Promise<SaveOutcome> {
-    const { notificationId, reason } = await scheduleGoalReminder(input);
+    const { notificationIds, reason } = await scheduleGoalReminder(input);
     setPermissionStatus(await getPermissionStatus());
 
     const base = {
@@ -87,8 +88,10 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
       title: input.title,
       description: input.description,
       category: input.category,
+      priority: input.priority,
+      subtasks: input.subtasks,
       createdAt: new Date().toISOString(),
-      notificationId,
+      notificationIds,
     };
 
     const goal: Goal =
@@ -102,7 +105,13 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
             targetUnit: input.targetUnit,
             status: 'active',
           }
-        : { ...base, kind: 'recurring', reminderTime: input.reminderTime, completedDates: [] };
+        : {
+            ...base,
+            kind: 'recurring',
+            recurrence: input.recurrence,
+            reminderTime: input.reminderTime,
+            completedDates: [],
+          };
 
     await commit([goal, ...goalsRef.current]);
     return { goal, scheduleReason: reason };
@@ -112,7 +121,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
     const existing = goalsRef.current.find((g) => g.id === id);
     if (!existing) throw new Error(`Goal ${id} not found`);
 
-    let notificationId = existing.notificationId ?? null;
+    let notificationIds = existing.notificationIds;
     let scheduleReason: ScheduleResult['reason'] = null;
     let updated: Goal;
 
@@ -120,8 +129,8 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
       const scheduleRelevantChange =
         existing.deadline !== input.deadline || existing.reminderDaysBefore !== input.reminderDaysBefore;
       if (scheduleRelevantChange) {
-        const res = await rescheduleGoalReminder({ ...input, notificationId: existing.notificationId });
-        notificationId = res.notificationId;
+        const res = await rescheduleGoalReminder({ ...input, notificationIds: existing.notificationIds });
+        notificationIds = res.notificationIds;
         scheduleReason = res.reason;
         setPermissionStatus(await getPermissionStatus());
       }
@@ -130,17 +139,21 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
         title: input.title,
         description: input.description,
         category: input.category,
+        priority: input.priority,
+        subtasks: input.subtasks,
         deadline: input.deadline,
         reminderDaysBefore: input.reminderDaysBefore,
         targetAmount: input.targetAmount,
         targetUnit: input.targetUnit,
-        notificationId,
+        notificationIds,
       };
     } else if (input.kind === 'recurring' && existing.kind === 'recurring') {
-      const scheduleRelevantChange = existing.reminderTime !== input.reminderTime;
+      const scheduleRelevantChange =
+        existing.reminderTime !== input.reminderTime ||
+        JSON.stringify(existing.recurrence) !== JSON.stringify(input.recurrence);
       if (scheduleRelevantChange) {
-        const res = await rescheduleGoalReminder({ ...input, notificationId: existing.notificationId });
-        notificationId = res.notificationId;
+        const res = await rescheduleGoalReminder({ ...input, notificationIds: existing.notificationIds });
+        notificationIds = res.notificationIds;
         scheduleReason = res.reason;
         setPermissionStatus(await getPermissionStatus());
       }
@@ -149,8 +162,11 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
         title: input.title,
         description: input.description,
         category: input.category,
+        priority: input.priority,
+        subtasks: input.subtasks,
+        recurrence: input.recurrence,
         reminderTime: input.reminderTime,
-        notificationId,
+        notificationIds,
       };
     } else {
       throw new Error('Goal kind cannot change after creation');
@@ -162,19 +178,19 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
 
   async function deleteGoal(id: string) {
     const existing = goalsRef.current.find((g) => g.id === id);
-    await cancelGoalReminder(existing?.notificationId);
+    await cancelGoalReminders(existing?.notificationIds);
     await commit(goalsRef.current.filter((g) => g.id !== id));
   }
 
   async function completeGoal(id: string) {
     const existing = goalsRef.current.find((g) => g.id === id);
     if (!existing || existing.kind !== 'onetime') return;
-    await cancelGoalReminder(existing.notificationId);
+    await cancelGoalReminders(existing.notificationIds);
     const updated: Goal = {
       ...existing,
       status: 'completed',
       completedAt: new Date().toISOString(),
-      notificationId: null,
+      notificationIds: [],
     };
     await commit(goalsRef.current.map((g) => (g.id === id ? updated : g)));
   }
@@ -182,10 +198,12 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
   async function undoComplete(id: string) {
     const existing = goalsRef.current.find((g) => g.id === id);
     if (!existing || existing.kind !== 'onetime') return;
-    const { notificationId } = await scheduleGoalReminder({
+    const { notificationIds } = await scheduleGoalReminder({
       kind: 'onetime',
       title: existing.title,
       category: existing.category,
+      priority: existing.priority,
+      subtasks: existing.subtasks,
       deadline: existing.deadline,
       reminderDaysBefore: existing.reminderDaysBefore,
     });
@@ -194,7 +212,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
       ...existing,
       status: 'active',
       completedAt: undefined,
-      notificationId,
+      notificationIds,
     };
     await commit(goalsRef.current.map((g) => (g.id === id ? updated : g)));
   }
@@ -217,6 +235,16 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
     await toggleRecurringOnDate(id, new Date());
   }
 
+  async function toggleSubtask(goalId: string, subtaskId: string) {
+    const existing = goalsRef.current.find((g) => g.id === goalId);
+    if (!existing) return;
+    const updated: Goal = {
+      ...existing,
+      subtasks: existing.subtasks.map((s) => (s.id === subtaskId ? { ...s, done: !s.done } : s)),
+    };
+    await commit(goalsRef.current.map((g) => (g.id === goalId ? updated : g)));
+  }
+
   async function refreshPermission() {
     setPermissionStatus(await getPermissionStatus());
   }
@@ -234,6 +262,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
       undoComplete,
       toggleRecurringToday,
       toggleRecurringOnDate,
+      toggleSubtask,
       refreshPermission,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps

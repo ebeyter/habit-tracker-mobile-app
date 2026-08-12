@@ -17,8 +17,19 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { addDays, formatDate, formatTimeOfDay, hhmmToDate, startOfDay, timeToHHMM, today } from '@/lib/date';
+import { generateId } from '@/lib/id';
+import { WEEKDAY_LABELS } from '@/lib/recurrence';
 import { suggestPlan } from '@/lib/smart-plan';
-import { CATEGORIES, type GoalCategory, type GoalKind } from '@/lib/types';
+import {
+  CATEGORIES,
+  PRIORITIES,
+  type GoalCategory,
+  type GoalKind,
+  type Priority,
+  type Recurrence,
+  type Subtask,
+  type Weekday,
+} from '@/lib/types';
 
 const REMINDER_MIN = 0;
 const REMINDER_MAX = 30;
@@ -43,6 +54,12 @@ export default function GoalFormScreen() {
 
   const [kind, setKind] = useState<GoalKind>('onetime');
   const [category, setCategory] = useState<GoalCategory>('genel');
+  const [priority, setPriority] = useState<Priority>('normal');
+  const [subtasks, setSubtasks] = useState<Subtask[]>([]);
+  const [subtaskDraft, setSubtaskDraft] = useState('');
+  const [recurrenceType, setRecurrenceType] = useState<Recurrence['type']>('daily');
+  const [weekdays, setWeekdays] = useState<Weekday[]>([1, 3, 5]);
+  const [everyN, setEveryN] = useState(2);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState<Date | null>(null);
@@ -54,12 +71,15 @@ export default function GoalFormScreen() {
   const [showIosTimePicker, setShowIosTimePicker] = useState(false);
   const [titleError, setTitleError] = useState<string | null>(null);
   const [deadlineError, setDeadlineError] = useState<string | null>(null);
+  const [recurrenceError, setRecurrenceError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
     if (!editingGoal) return;
     setKind(editingGoal.kind);
     setCategory(editingGoal.category);
+    setPriority(editingGoal.priority);
+    setSubtasks(editingGoal.subtasks);
     setTitle(editingGoal.title);
     setDescription(editingGoal.description ?? '');
     if (editingGoal.kind === 'onetime') {
@@ -69,12 +89,32 @@ export default function GoalFormScreen() {
       setTargetUnit(editingGoal.targetUnit ?? '');
     } else {
       setReminderTime(editingGoal.reminderTime);
+      setRecurrenceType(editingGoal.recurrence.type);
+      if (editingGoal.recurrence.type === 'weekdays') setWeekdays(editingGoal.recurrence.days);
+      if (editingGoal.recurrence.type === 'everyN') setEveryN(editingGoal.recurrence.n);
     }
   }, [editingGoal]);
 
   function applyPreset(preset: { title: string; category: GoalCategory }) {
     setTitle(preset.title);
     setCategory(preset.category);
+  }
+
+  function buildRecurrence(): Recurrence {
+    if (recurrenceType === 'weekdays') return { type: 'weekdays', days: weekdays };
+    if (recurrenceType === 'everyN') return { type: 'everyN', n: everyN };
+    return { type: 'daily' };
+  }
+
+  function toggleWeekday(day: Weekday) {
+    setWeekdays((prev) => (prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]));
+  }
+
+  function addSubtask() {
+    const trimmed = subtaskDraft.trim();
+    if (!trimmed) return;
+    setSubtasks((prev) => [...prev, { id: generateId(), title: trimmed, done: false }]);
+    setSubtaskDraft('');
   }
 
   function openDatePicker() {
@@ -127,6 +167,12 @@ export default function GoalFormScreen() {
     } else {
       setDeadlineError(null);
     }
+    if (kind === 'recurring' && recurrenceType === 'weekdays' && weekdays.length === 0) {
+      setRecurrenceError('En az bir gün seç.');
+      ok = false;
+    } else {
+      setRecurrenceError(null);
+    }
     return ok;
   }
 
@@ -135,23 +181,27 @@ export default function GoalFormScreen() {
     setSaving(true);
     try {
       const parsedAmount = Number(targetAmount);
+      const shared = {
+        title: title.trim(),
+        description: description.trim() || undefined,
+        category,
+        priority,
+        subtasks,
+      };
       const input =
         kind === 'onetime'
           ? {
+              ...shared,
               kind: 'onetime' as const,
-              title: title.trim(),
-              description: description.trim() || undefined,
-              category,
               deadline: startOfDay(deadline!).toISOString(),
               reminderDaysBefore,
               targetAmount: targetAmount.trim() && parsedAmount > 0 ? parsedAmount : undefined,
               targetUnit: targetUnit.trim() || undefined,
             }
           : {
+              ...shared,
               kind: 'recurring' as const,
-              title: title.trim(),
-              description: description.trim() || undefined,
-              category,
+              recurrence: buildRecurrence(),
               reminderTime,
             };
 
@@ -217,7 +267,7 @@ export default function GoalFormScreen() {
           )}
           {isEditing && (
             <Text style={[styles.kindLabel, { color: colors.textMuted, marginBottom: spacing.md }]}>
-              Tür: {kind === 'onetime' ? 'Tek Seferlik (bitiş tarihli)' : 'Tekrarlayan (her gün)'}
+              Tür: {kind === 'onetime' ? 'Tek Seferlik (bitiş tarihli)' : 'Tekrarlayan'}
             </Text>
           )}
 
@@ -260,6 +310,27 @@ export default function GoalFormScreen() {
                 >
                   <Text style={[styles.chipText, { color: active ? '#fff' : colors.text }]}>
                     {c.emoji} {c.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>Öncelik</Text>
+          <View style={styles.chipRow}>
+            {PRIORITIES.map((p) => {
+              const active = priority === p.id;
+              return (
+                <Pressable
+                  key={p.id}
+                  onPress={() => setPriority(p.id)}
+                  style={[
+                    styles.chip,
+                    { borderRadius: radius.pill, backgroundColor: active ? colors.tint : colors.border },
+                  ]}
+                >
+                  <Text style={[styles.chipText, { color: active ? '#fff' : colors.text }]}>
+                    {p.symbol} {p.label}
                   </Text>
                 </Pressable>
               );
@@ -390,7 +461,75 @@ export default function GoalFormScreen() {
           ) : (
             <>
               <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>
-                Her Gün Hatırlatma Saati
+                Ne Sıklıkla Tekrarlansın?
+              </Text>
+              <View style={styles.chipRow}>
+                {([
+                  { id: 'daily' as const, label: 'Her gün' },
+                  { id: 'weekdays' as const, label: 'Haftanın günleri' },
+                  { id: 'everyN' as const, label: 'N günde bir' },
+                ]).map((r) => {
+                  const active = recurrenceType === r.id;
+                  return (
+                    <Pressable
+                      key={r.id}
+                      onPress={() => setRecurrenceType(r.id)}
+                      style={[
+                        styles.chip,
+                        { borderRadius: radius.pill, backgroundColor: active ? colors.tint : colors.border },
+                      ]}
+                    >
+                      <Text style={[styles.chipText, { color: active ? '#fff' : colors.text }]}>{r.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+
+              {recurrenceType === 'weekdays' && (
+                <View style={[styles.chipRow, { marginTop: spacing.sm }]}>
+                  {WEEKDAY_LABELS.map((w) => {
+                    const active = weekdays.includes(w.day);
+                    return (
+                      <Pressable
+                        key={w.day}
+                        onPress={() => toggleWeekday(w.day)}
+                        style={[
+                          styles.dayChip,
+                          { borderRadius: radius.pill, backgroundColor: active ? colors.tint : colors.border },
+                        ]}
+                      >
+                        <Text style={[styles.chipText, { color: active ? '#fff' : colors.text }]}>
+                          {w.short}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+              )}
+
+              {recurrenceType === 'everyN' && (
+                <View style={[styles.stepperRow, { marginTop: spacing.sm }]}>
+                  <StepperButton
+                    label="−"
+                    onPress={() => setEveryN((v) => Math.max(2, v - 1))}
+                    colors={colors}
+                    radius={radius}
+                  />
+                  <Text style={[styles.stepperValue, { color: colors.text }]}>{everyN} günde bir</Text>
+                  <StepperButton
+                    label="+"
+                    onPress={() => setEveryN((v) => Math.min(30, v + 1))}
+                    colors={colors}
+                    radius={radius}
+                  />
+                </View>
+              )}
+              {!!recurrenceError && (
+                <Text style={[styles.error, { color: colors.danger }]}>{recurrenceError}</Text>
+              )}
+
+              <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>
+                Hatırlatma Saati
               </Text>
               <Pressable
                 onPress={openTimePicker}
@@ -412,11 +551,45 @@ export default function GoalFormScreen() {
                 />
               )}
               <Text style={[styles.hint, { color: colors.textMuted }]}>
-                Bitiş tarihi yok; bu hedef her gün belirtilen saatte hatırlatılır ve o gün tamamlandığında
-                seriye (streak) sayılır.
+                Bitiş tarihi yok; bu hedef seçtiğin sıklıkta belirtilen saatte hatırlatılır ve tamamlandığı
+                gün seriye (streak) sayılır.
               </Text>
             </>
           )}
+
+          <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>
+            Alt Görevler (opsiyonel)
+          </Text>
+          {subtasks.map((s) => (
+            <View key={s.id} style={[styles.subtaskRow, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.subtaskTitle, { color: colors.text }]}>{s.title}</Text>
+              <Pressable
+                onPress={() => setSubtasks((prev) => prev.filter((x) => x.id !== s.id))}
+                hitSlop={10}
+              >
+                <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700' }}>Sil</Text>
+              </Pressable>
+            </View>
+          ))}
+          <View style={[styles.row, { gap: spacing.sm, marginTop: spacing.sm }]}>
+            <TextInput
+              value={subtaskDraft}
+              onChangeText={setSubtaskDraft}
+              placeholder="Adım ekle"
+              placeholderTextColor={colors.textMuted}
+              onSubmitEditing={addSubtask}
+              style={[
+                styles.input,
+                { flex: 1, backgroundColor: colors.surface, color: colors.text, borderRadius: radius.sm, borderColor: colors.border },
+              ]}
+            />
+            <Pressable
+              onPress={addSubtask}
+              style={[styles.addSubtaskButton, { backgroundColor: colors.tint, borderRadius: radius.sm }]}
+            >
+              <Text style={{ color: '#fff', fontWeight: '700' }}>Ekle</Text>
+            </Pressable>
+          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -512,6 +685,25 @@ const styles = StyleSheet.create({
   },
   amountInput: {
     flex: 1,
+  },
+  dayChip: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+  },
+  subtaskRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 10,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  subtaskTitle: {
+    flex: 1,
+    fontSize: 14,
+  },
+  addSubtaskButton: {
+    paddingHorizontal: 16,
+    justifyContent: 'center',
   },
   unitInput: {
     flex: 1.4,

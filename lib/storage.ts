@@ -12,7 +12,17 @@ function isValidGoal(g: unknown): g is Goal {
 
 /** Backfills fields added after a goal was first saved, so older local data keeps working. */
 function normalizeGoal(g: Goal): Goal {
-  return g.category ? g : { ...g, category: 'genel' };
+  const legacyNotificationId = (g as { notificationId?: string | null }).notificationId;
+  const base = {
+    ...g,
+    category: g.category ?? 'genel',
+    priority: g.priority ?? 'normal',
+    subtasks: g.subtasks ?? [],
+    notificationIds: g.notificationIds ?? (legacyNotificationId ? [legacyNotificationId] : []),
+  };
+  return base.kind === 'recurring'
+    ? { ...base, recurrence: base.recurrence ?? { type: 'daily' } }
+    : base;
 }
 
 export async function getGoals(): Promise<Goal[]> {

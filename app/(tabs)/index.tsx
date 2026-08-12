@@ -26,6 +26,7 @@ export default function GoalsScreen() {
     completeGoal,
     undoComplete,
     toggleRecurringToday,
+    toggleSubtask,
     deleteGoal,
   } = useGoals();
 
@@ -143,6 +144,7 @@ export default function GoalsScreen() {
                     onComplete={() => {}}
                     onUndo={() => {}}
                     onToggleToday={() => toggleRecurringToday(goal.id)}
+                    onToggleSubtask={(sid) => toggleSubtask(goal.id, sid)}
                     onEdit={() => router.push({ pathname: '/goal-form', params: { id: goal.id } })}
                     onDelete={() => confirmDelete(goal)}
                   />
@@ -160,6 +162,7 @@ export default function GoalsScreen() {
                     onComplete={() => completeGoal(goal.id)}
                     onUndo={() => undoComplete(goal.id)}
                     onToggleToday={() => {}}
+                  onToggleSubtask={(sid) => toggleSubtask(goal.id, sid)}
                     onEdit={() => router.push({ pathname: '/goal-form', params: { id: goal.id } })}
                     onDelete={() => confirmDelete(goal)}
                   />
@@ -178,6 +181,7 @@ export default function GoalsScreen() {
                   onComplete={() => completeGoal(goal.id)}
                   onUndo={() => undoComplete(goal.id)}
                   onToggleToday={() => {}}
+                  onToggleSubtask={(sid) => toggleSubtask(goal.id, sid)}
                   onEdit={() => router.push({ pathname: '/goal-form', params: { id: goal.id } })}
                   onDelete={() => confirmDelete(goal)}
                 />
@@ -194,6 +198,7 @@ export default function GoalsScreen() {
                     onComplete={() => completeGoal(goal.id)}
                     onUndo={() => undoComplete(goal.id)}
                     onToggleToday={() => {}}
+                  onToggleSubtask={(sid) => toggleSubtask(goal.id, sid)}
                     onEdit={() => router.push({ pathname: '/goal-form', params: { id: goal.id } })}
                     onDelete={() => confirmDelete(goal)}
                   />
