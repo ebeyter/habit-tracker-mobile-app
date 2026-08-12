@@ -86,6 +86,12 @@ Terminalde `i` / `a` ile simulator/emulator açabilir, ya da QR kodu Expo Go ile
 
 > QR kod yalnızca bu terminal çalışırken geçerlidir; `Ctrl + C` sunucuyu durdurur.
 
+> **Expo Go ile açarken:** projede `expo-dev-client` kurulu olduğu için `npx expo start` varsayılan
+> olarak *development build* modunda açılır ve QR'a `com.anonymous...://` şemalı bir adres koyar.
+> Telefonda development build kurulu değilse kamera bunu açamaz ("no usable data found"). Expo Go
+> kullanacaksan terminalde **`s`** tuşuna basıp Expo Go moduna geç, ya da doğrudan
+> `npx expo start --tunnel --go` ile başlat.
+
 ## Local Development Build
 
 `expo-notifications`, `async-storage` ve `datetimepicker` native modül içerdiğinden, tam native davranışı (izin promptları, native tarih seçici vb.) test etmek için development build önerilir:
