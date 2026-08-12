@@ -20,7 +20,9 @@ function normalizeGoal(g: Goal): Goal {
     subtasks: g.subtasks ?? [],
     notificationIds: g.notificationIds ?? (legacyNotificationId ? [legacyNotificationId] : []),
   };
-  if (base.kind !== 'recurring') return base;
+  if (base.kind !== 'recurring') {
+    return { ...base, reminderTime: base.reminderTime ?? '09:00' };
+  }
   const legacyTime = (base as { reminderTime?: string }).reminderTime;
   return {
     ...base,

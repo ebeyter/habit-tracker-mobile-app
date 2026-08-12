@@ -52,6 +52,8 @@ export type OneTimeGoal = BaseGoal & {
   deadline: string;
   /** How many days before the deadline to send the reminder (0 = same day) */
   reminderDaysBefore: number;
+  /** "HH:mm" local time the reminder fires at on that day */
+  reminderTime: string;
   status: GoalStatus;
   completedAt?: string;
   /** Optional total amount to complete by the deadline (e.g. 300 "sayfa") — powers the local Smart Plan suggestion */
@@ -109,6 +111,7 @@ export type NewOneTimeGoalInput = NewGoalShared & {
   kind: 'onetime';
   deadline: string;
   reminderDaysBefore: number;
+  reminderTime: string;
   targetAmount?: number;
   targetUnit?: string;
 };

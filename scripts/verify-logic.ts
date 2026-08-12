@@ -72,7 +72,15 @@ check(
 check(
   'tek seferlik hedef de seriye sayılıyor',
   computeStreak([
-    { ...base, kind: 'onetime', deadline: today().toISOString(), reminderDaysBefore: 0, status: 'completed', completedAt: new Date().toISOString() } as Goal,
+    {
+      ...base,
+      kind: 'onetime',
+      deadline: today().toISOString(),
+      reminderDaysBefore: 0,
+      reminderTime: '09:00',
+      status: 'completed',
+      completedAt: new Date().toISOString(),
+    } as Goal,
   ]).currentStreak,
   1
 );

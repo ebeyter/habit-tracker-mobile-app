@@ -165,6 +165,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
             kind: 'onetime',
             deadline: input.deadline,
             reminderDaysBefore: input.reminderDaysBefore,
+            reminderTime: input.reminderTime,
             targetAmount: input.targetAmount,
             targetUnit: input.targetUnit,
             status: 'active',
@@ -191,7 +192,9 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
 
     if (input.kind === 'onetime' && existing.kind === 'onetime') {
       const scheduleRelevantChange =
-        existing.deadline !== input.deadline || existing.reminderDaysBefore !== input.reminderDaysBefore;
+        existing.deadline !== input.deadline ||
+        existing.reminderDaysBefore !== input.reminderDaysBefore ||
+        existing.reminderTime !== input.reminderTime;
       if (scheduleRelevantChange) {
         const res = await rescheduleGoalReminder({ ...input, notificationIds: existing.notificationIds });
         notificationIds = res.notificationIds;
@@ -207,6 +210,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
         subtasks: input.subtasks,
         deadline: input.deadline,
         reminderDaysBefore: input.reminderDaysBefore,
+        reminderTime: input.reminderTime,
         targetAmount: input.targetAmount,
         targetUnit: input.targetUnit,
         notificationIds,
@@ -270,6 +274,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
       subtasks: existing.subtasks,
       deadline: existing.deadline,
       reminderDaysBefore: existing.reminderDaysBefore,
+      reminderTime: existing.reminderTime,
     });
     setPermissionStatus(await getPermissionStatus());
     const updated: Goal = {

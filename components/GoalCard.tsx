@@ -161,7 +161,9 @@ export function GoalCard({
       )}
 
       <Text style={[styles.meta, { color: colors.textMuted }]}>
-        Bitiş: {formatDate(goal.deadline)} · Hatırlatma: {goal.reminderDaysBefore === 0 ? 'aynı gün' : `${goal.reminderDaysBefore} gün önce`}
+        Bitiş: {formatDate(goal.deadline)} · Hatırlatma:{' '}
+        {goal.reminderDaysBefore === 0 ? 'aynı gün' : `${goal.reminderDaysBefore} gün önce`}{' '}
+        {formatTimeOfDay(goal.reminderTime)}
         {goal.notificationIds.length === 0 && goal.status === 'active' ? ' · bildirim yok' : ''}
       </Text>
 

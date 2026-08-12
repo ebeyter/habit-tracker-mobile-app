@@ -51,10 +51,11 @@ async function ensurePermission(): Promise<PermissionStatus> {
   return status;
 }
 
-function oneTimeReminderDate(deadline: string, reminderDaysBefore: number): Date {
+function oneTimeReminderDate(deadline: string, reminderDaysBefore: number, time: string): Date {
   const deadlineDay = startOfDay(new Date(deadline));
   const day = addDays(deadlineDay, -reminderDaysBefore);
-  day.setHours(9, 0, 0, 0);
+  const [hour, minute] = time.split(':').map(Number);
+  day.setHours(hour, minute, 0, 0);
   return day;
 }
 
@@ -64,9 +65,12 @@ export type ScheduleResult = {
 };
 
 async function scheduleOneTimeReminder(
-  goal: Pick<Extract<NewGoalInput, { kind: 'onetime' }>, 'title' | 'deadline' | 'reminderDaysBefore'>
+  goal: Pick<
+    Extract<NewGoalInput, { kind: 'onetime' }>,
+    'title' | 'deadline' | 'reminderDaysBefore' | 'reminderTime'
+  >
 ): Promise<ScheduleResult> {
-  const when = oneTimeReminderDate(goal.deadline, goal.reminderDaysBefore);
+  const when = oneTimeReminderDate(goal.deadline, goal.reminderDaysBefore, goal.reminderTime);
   if (when.getTime() <= Date.now()) {
     return { notificationIds: [], reason: 'past' };
   }

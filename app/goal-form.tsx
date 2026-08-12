@@ -67,6 +67,8 @@ export default function GoalFormScreen() {
   const [reminderDaysBefore, setReminderDaysBefore] = useState(1);
   const [targetAmount, setTargetAmount] = useState('');
   const [targetUnit, setTargetUnit] = useState('');
+  const [onceReminderTime, setOnceReminderTime] = useState(DEFAULT_REMINDER_TIME);
+  const [showIosOnceTimePicker, setShowIosOnceTimePicker] = useState(false);
   const [reminderTimes, setReminderTimes] = useState<string[]>([DEFAULT_REMINDER_TIME]);
   const [editingTimeIndex, setEditingTimeIndex] = useState<number | null>(null);
   const [showIosDatePicker, setShowIosDatePicker] = useState(false);
@@ -89,6 +91,7 @@ export default function GoalFormScreen() {
     if (editingGoal.kind === 'onetime') {
       setDeadline(new Date(editingGoal.deadline));
       setReminderDaysBefore(editingGoal.reminderDaysBefore);
+      setOnceReminderTime(editingGoal.reminderTime);
       setTargetAmount(editingGoal.targetAmount ? String(editingGoal.targetAmount) : '');
       setTargetUnit(editingGoal.targetUnit ?? '');
     } else {
@@ -242,6 +245,7 @@ export default function GoalFormScreen() {
               kind: 'onetime' as const,
               deadline: startOfDay(deadline!).toISOString(),
               reminderDaysBefore,
+              reminderTime: onceReminderTime,
               targetAmount: targetAmount.trim() && parsedAmount > 0 ? parsedAmount : undefined,
               targetUnit: targetUnit.trim() || undefined,
             }
@@ -522,6 +526,41 @@ export default function GoalFormScreen() {
                 </Text>
                 <StepperButton label="+" onPress={() => adjustReminder(1)} colors={colors} radius={radius} />
               </View>
+
+              <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>
+                Hatırlatma Saati
+              </Text>
+              <Pressable
+                onPress={() => {
+                  if (Platform.OS === 'android') {
+                    DateTimePickerAndroid.open({
+                      value: hhmmToDate(onceReminderTime),
+                      mode: 'time',
+                      onChange: (_e, selected) => {
+                        if (selected) setOnceReminderTime(timeToHHMM(selected));
+                      },
+                    });
+                  } else {
+                    setShowIosOnceTimePicker((v) => !v);
+                  }
+                }}
+                style={[
+                  styles.dateButton,
+                  { backgroundColor: colors.surface, borderRadius: radius.sm, borderColor: colors.border },
+                ]}
+              >
+                <Text style={{ color: colors.text }}>{formatTimeOfDay(onceReminderTime)}</Text>
+              </Pressable>
+              {Platform.OS === 'ios' && showIosOnceTimePicker && (
+                <DateTimePicker
+                  value={hhmmToDate(onceReminderTime)}
+                  mode="time"
+                  display="spinner"
+                  onChange={(_e, selected) => {
+                    if (selected) setOnceReminderTime(timeToHHMM(selected));
+                  }}
+                />
+              )}
 
               <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>
                 Hedef Miktar (opsiyonel — Akıllı Plan için)
