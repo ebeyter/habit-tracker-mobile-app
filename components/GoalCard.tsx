@@ -2,7 +2,12 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { dayKey, daysUntil, formatDate, formatTimeOfDay, isPastDay } from '@/lib/date';
-import type { Goal } from '@/lib/types';
+import { suggestPlan } from '@/lib/smart-plan';
+import { CATEGORIES, type Goal } from '@/lib/types';
+
+function categoryEmoji(id: Goal['category']): string {
+  return CATEGORIES.find((c) => c.id === id)?.emoji ?? '🎯';
+}
 
 type Props = {
   goal: Goal;
@@ -30,7 +35,9 @@ export function GoalCard({ goal, onComplete, onUndo, onToggleToday, onEdit, onDe
         ]}
       >
         <View style={styles.headerRow}>
-          <Text style={[styles.title, { color: colors.text }]}>{goal.title}</Text>
+          <Text style={[styles.title, { color: colors.text }]}>
+            {categoryEmoji(goal.category)} {goal.title}
+          </Text>
           <View style={[styles.badge, { backgroundColor: badge.bg }]}>
             <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.label}</Text>
           </View>
@@ -92,7 +99,7 @@ export function GoalCard({ goal, onComplete, onUndo, onToggleToday, onEdit, onDe
             { color: colors.text, textDecorationLine: goal.status === 'completed' ? 'line-through' : 'none' },
           ]}
         >
-          {goal.title}
+          {categoryEmoji(goal.category)} {goal.title}
         </Text>
         <View style={[styles.badge, { backgroundColor: badge.bg }]}>
           <Text style={[styles.badgeText, { color: badge.fg }]}>{badge.label}</Text>
@@ -109,6 +116,12 @@ export function GoalCard({ goal, onComplete, onUndo, onToggleToday, onEdit, onDe
         Bitiş: {formatDate(goal.deadline)} · Hatırlatma: {goal.reminderDaysBefore === 0 ? 'aynı gün' : `${goal.reminderDaysBefore} gün önce`}
         {goal.notificationId === null && goal.status === 'active' ? ' · bildirim yok' : ''}
       </Text>
+
+      {goal.status === 'active' && (
+        <Text style={[styles.plan, { color: colors.tint }]}>
+          💡 {suggestPlan(goal.deadline, goal.targetAmount, goal.targetUnit)}
+        </Text>
+      )}
 
       <View style={[styles.actions, { gap: spacing.sm }]}>
         {goal.status === 'active' ? (
@@ -176,6 +189,11 @@ const styles = StyleSheet.create({
   meta: {
     fontSize: 12,
     marginTop: 8,
+  },
+  plan: {
+    fontSize: 12,
+    fontWeight: '600',
+    marginTop: 6,
   },
   actions: {
     flexDirection: 'row',

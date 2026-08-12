@@ -1,17 +1,20 @@
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
 import { GoalCard } from '@/components/GoalCard';
+import { MascotCard } from '@/components/MascotCard';
 import { PermissionBanner } from '@/components/PermissionBanner';
 import { SectionHeader } from '@/components/SectionHeader';
 import { StreakHeader } from '@/components/StreakHeader';
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { isPastDay } from '@/lib/date';
-import type { Goal, OneTimeGoal, RecurringGoal } from '@/lib/types';
+import { CATEGORIES, type Goal, type GoalCategory, type OneTimeGoal, type RecurringGoal } from '@/lib/types';
+
+type CategoryFilter = GoalCategory | 'all';
 
 export default function GoalsScreen() {
   const { colors, spacing, radius } = useAppTheme();
@@ -26,13 +29,20 @@ export default function GoalsScreen() {
     deleteGoal,
   } = useGoals();
 
+  const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
+
+  const filteredGoals = useMemo(
+    () => (categoryFilter === 'all' ? goals : goals.filter((g) => g.category === categoryFilter)),
+    [goals, categoryFilter]
+  );
+
   const sections = useMemo(() => {
     const recurring: RecurringGoal[] = [];
     const overdue: OneTimeGoal[] = [];
     const active: OneTimeGoal[] = [];
     const completed: OneTimeGoal[] = [];
 
-    for (const goal of goals) {
+    for (const goal of filteredGoals) {
       if (goal.kind === 'recurring') {
         recurring.push(goal);
       } else if (goal.status === 'completed') {
@@ -51,7 +61,7 @@ export default function GoalsScreen() {
     recurring.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 
     return { recurring, overdue, active, completed };
-  }, [goals]);
+  }, [filteredGoals]);
 
   function confirmDelete(goal: Goal) {
     Alert.alert('Hedefi sil', `"${goal.title}" silinsin mi?`, [
@@ -71,6 +81,7 @@ export default function GoalsScreen() {
   }
 
   const hasGoals = goals.length > 0;
+  const hasFilteredGoals = filteredGoals.length > 0;
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={['top']}>
@@ -82,7 +93,11 @@ export default function GoalsScreen() {
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl * 2 }}
         showsVerticalScrollIndicator={false}
       >
-        <StreakHeader streak={streak} />
+        <MascotCard streak={streak} />
+
+        <View style={{ marginTop: spacing.md }}>
+          <StreakHeader streak={streak} />
+        </View>
 
         {permissionStatus === 'denied' && (
           <View style={{ marginTop: spacing.md }}>
@@ -90,8 +105,32 @@ export default function GoalsScreen() {
           </View>
         )}
 
+        {hasGoals && (
+          <View style={[styles.chipRow, { marginTop: spacing.md }]}>
+            <CategoryChip
+              label="Tümü"
+              emoji="✨"
+              active={categoryFilter === 'all'}
+              onPress={() => setCategoryFilter('all')}
+            />
+            {CATEGORIES.map((c) => (
+              <CategoryChip
+                key={c.id}
+                label={c.label}
+                emoji={c.emoji}
+                active={categoryFilter === c.id}
+                onPress={() => setCategoryFilter(c.id)}
+              />
+            ))}
+          </View>
+        )}
+
         {!hasGoals ? (
           <EmptyState onCreate={() => router.push('/goal-form')} />
+        ) : !hasFilteredGoals ? (
+          <Text style={[styles.sectionEmpty, { color: colors.textMuted, marginTop: spacing.lg }]}>
+            Bu kategoride hedef yok.
+          </Text>
         ) : (
           <>
             {sections.recurring.length > 0 && (
@@ -186,6 +225,33 @@ export default function GoalsScreen() {
   );
 }
 
+function CategoryChip({
+  label,
+  emoji,
+  active,
+  onPress,
+}: {
+  label: string;
+  emoji: string;
+  active: boolean;
+  onPress: () => void;
+}) {
+  const { colors, radius } = useAppTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.chip,
+        { borderRadius: radius.pill, backgroundColor: active ? colors.tint : colors.surface },
+      ]}
+    >
+      <Text style={[styles.chipText, { color: active ? '#fff' : colors.text }]}>
+        {emoji} {label}
+      </Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
   flex: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
@@ -199,6 +265,19 @@ const styles = StyleSheet.create({
   sectionEmpty: {
     fontSize: 13,
     marginBottom: 8,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '600',
   },
   fab: {
     position: 'absolute',

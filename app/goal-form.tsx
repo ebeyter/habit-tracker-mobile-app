@@ -17,11 +17,20 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { addDays, formatDate, formatTimeOfDay, hhmmToDate, startOfDay, timeToHHMM, today } from '@/lib/date';
-import type { GoalKind } from '@/lib/types';
+import { suggestPlan } from '@/lib/smart-plan';
+import { CATEGORIES, type GoalCategory, type GoalKind } from '@/lib/types';
 
 const REMINDER_MIN = 0;
 const REMINDER_MAX = 30;
 const DEFAULT_REMINDER_TIME = '09:00';
+
+const PRESET_RECURRING: { title: string; category: GoalCategory }[] = [
+  { title: 'Su iç', category: 'saglik' },
+  { title: 'Kitap oku', category: 'egitim' },
+  { title: 'Egzersiz yap', category: 'saglik' },
+  { title: 'Meditasyon yap', category: 'kisisel' },
+  { title: 'Erken uyu', category: 'saglik' },
+];
 
 export default function GoalFormScreen() {
   const { colors, spacing, radius } = useAppTheme();
@@ -33,10 +42,13 @@ export default function GoalFormScreen() {
   const minDate = useMemo(() => addDays(today(), 1), []);
 
   const [kind, setKind] = useState<GoalKind>('onetime');
+  const [category, setCategory] = useState<GoalCategory>('genel');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [deadline, setDeadline] = useState<Date | null>(null);
   const [reminderDaysBefore, setReminderDaysBefore] = useState(1);
+  const [targetAmount, setTargetAmount] = useState('');
+  const [targetUnit, setTargetUnit] = useState('');
   const [reminderTime, setReminderTime] = useState(DEFAULT_REMINDER_TIME);
   const [showIosDatePicker, setShowIosDatePicker] = useState(false);
   const [showIosTimePicker, setShowIosTimePicker] = useState(false);
@@ -47,15 +59,23 @@ export default function GoalFormScreen() {
   useEffect(() => {
     if (!editingGoal) return;
     setKind(editingGoal.kind);
+    setCategory(editingGoal.category);
     setTitle(editingGoal.title);
     setDescription(editingGoal.description ?? '');
     if (editingGoal.kind === 'onetime') {
       setDeadline(new Date(editingGoal.deadline));
       setReminderDaysBefore(editingGoal.reminderDaysBefore);
+      setTargetAmount(editingGoal.targetAmount ? String(editingGoal.targetAmount) : '');
+      setTargetUnit(editingGoal.targetUnit ?? '');
     } else {
       setReminderTime(editingGoal.reminderTime);
     }
   }, [editingGoal]);
+
+  function applyPreset(preset: { title: string; category: GoalCategory }) {
+    setTitle(preset.title);
+    setCategory(preset.category);
+  }
 
   function openDatePicker() {
     if (Platform.OS === 'android') {
@@ -114,19 +134,24 @@ export default function GoalFormScreen() {
     if (!validate()) return;
     setSaving(true);
     try {
+      const parsedAmount = Number(targetAmount);
       const input =
         kind === 'onetime'
           ? {
               kind: 'onetime' as const,
               title: title.trim(),
               description: description.trim() || undefined,
+              category,
               deadline: startOfDay(deadline!).toISOString(),
               reminderDaysBefore,
+              targetAmount: targetAmount.trim() && parsedAmount > 0 ? parsedAmount : undefined,
+              targetUnit: targetUnit.trim() || undefined,
             }
           : {
               kind: 'recurring' as const,
               title: title.trim(),
               description: description.trim() || undefined,
+              category,
               reminderTime,
             };
 
@@ -196,7 +221,52 @@ export default function GoalFormScreen() {
             </Text>
           )}
 
-          <Text style={[styles.label, { color: colors.textMuted }]}>Başlık</Text>
+          {kind === 'recurring' && !isEditing && (
+            <>
+              <Text style={[styles.label, { color: colors.textMuted }]}>Hızlı Şablonlar</Text>
+              <View style={styles.chipRow}>
+                {PRESET_RECURRING.map((preset) => (
+                  <Pressable
+                    key={preset.title}
+                    onPress={() => applyPreset(preset)}
+                    style={[styles.chip, { backgroundColor: colors.border, borderRadius: radius.pill }]}
+                  >
+                    <Text style={[styles.chipText, { color: colors.text }]}>
+                      {CATEGORIES.find((c) => c.id === preset.category)?.emoji} {preset.title}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </>
+          )}
+
+          <Text style={[styles.label, { color: colors.textMuted, marginTop: kind === 'recurring' && !isEditing ? 16 : 0 }]}>
+            Kategori
+          </Text>
+          <View style={styles.chipRow}>
+            {CATEGORIES.map((c) => {
+              const active = category === c.id;
+              return (
+                <Pressable
+                  key={c.id}
+                  onPress={() => setCategory(c.id)}
+                  style={[
+                    styles.chip,
+                    {
+                      borderRadius: radius.pill,
+                      backgroundColor: active ? colors.tint : colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.chipText, { color: active ? '#fff' : colors.text }]}>
+                    {c.emoji} {c.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </View>
+
+          <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>Başlık</Text>
           <TextInput
             value={title}
             onChangeText={(t) => {
@@ -278,6 +348,44 @@ export default function GoalFormScreen() {
                 </Text>
                 <StepperButton label="+" onPress={() => adjustReminder(1)} colors={colors} radius={radius} />
               </View>
+
+              <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>
+                Hedef Miktar (opsiyonel — Akıllı Plan için)
+              </Text>
+              <View style={[styles.row, { gap: spacing.sm }]}>
+                <TextInput
+                  value={targetAmount}
+                  onChangeText={setTargetAmount}
+                  placeholder="Örn: 300"
+                  placeholderTextColor={colors.textMuted}
+                  keyboardType="number-pad"
+                  style={[
+                    styles.input,
+                    styles.amountInput,
+                    { backgroundColor: colors.surface, color: colors.text, borderRadius: radius.sm, borderColor: colors.border },
+                  ]}
+                />
+                <TextInput
+                  value={targetUnit}
+                  onChangeText={setTargetUnit}
+                  placeholder="Birim (örn: sayfa)"
+                  placeholderTextColor={colors.textMuted}
+                  style={[
+                    styles.input,
+                    styles.unitInput,
+                    { backgroundColor: colors.surface, color: colors.text, borderRadius: radius.sm, borderColor: colors.border },
+                  ]}
+                />
+              </View>
+              {deadline && (
+                <Text style={[styles.hint, { color: colors.tint }]}>
+                  💡 {suggestPlan(
+                    deadline.toISOString(),
+                    Number(targetAmount) > 0 ? Number(targetAmount) : undefined,
+                    targetUnit
+                  )}
+                </Text>
+              )}
             </>
           ) : (
             <>
@@ -385,6 +493,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     padding: 4,
     marginBottom: 20,
+  },
+  chipRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  chip: {
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  chipText: {
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  row: {
+    flexDirection: 'row',
+  },
+  amountInput: {
+    flex: 1,
+  },
+  unitInput: {
+    flex: 1.4,
   },
   segmentButton: {
     flex: 1,

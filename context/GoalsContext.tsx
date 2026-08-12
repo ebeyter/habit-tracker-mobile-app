@@ -85,6 +85,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
       id: generateId(),
       title: input.title,
       description: input.description,
+      category: input.category,
       createdAt: new Date().toISOString(),
       notificationId,
     };
@@ -96,6 +97,8 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
             kind: 'onetime',
             deadline: input.deadline,
             reminderDaysBefore: input.reminderDaysBefore,
+            targetAmount: input.targetAmount,
+            targetUnit: input.targetUnit,
             status: 'active',
           }
         : { ...base, kind: 'recurring', reminderTime: input.reminderTime, completedDates: [] };
@@ -125,8 +128,11 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
         ...existing,
         title: input.title,
         description: input.description,
+        category: input.category,
         deadline: input.deadline,
         reminderDaysBefore: input.reminderDaysBefore,
+        targetAmount: input.targetAmount,
+        targetUnit: input.targetUnit,
         notificationId,
       };
     } else if (input.kind === 'recurring' && existing.kind === 'recurring') {
@@ -141,6 +147,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
         ...existing,
         title: input.title,
         description: input.description,
+        category: input.category,
         reminderTime: input.reminderTime,
         notificationId,
       };
@@ -177,6 +184,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
     const { notificationId } = await scheduleGoalReminder({
       kind: 'onetime',
       title: existing.title,
+      category: existing.category,
       deadline: existing.deadline,
       reminderDaysBefore: existing.reminderDaysBefore,
     });

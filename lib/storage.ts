@@ -10,6 +10,11 @@ function isValidGoal(g: unknown): g is Goal {
   return kind === 'onetime' || kind === 'recurring';
 }
 
+/** Backfills fields added after a goal was first saved, so older local data keeps working. */
+function normalizeGoal(g: Goal): Goal {
+  return g.category ? g : { ...g, category: 'genel' };
+}
+
 export async function getGoals(): Promise<Goal[]> {
   const raw = await AsyncStorage.getItem(GOALS_KEY);
   if (!raw) return [];
@@ -17,7 +22,7 @@ export async function getGoals(): Promise<Goal[]> {
     const parsed = JSON.parse(raw) as unknown;
     if (!Array.isArray(parsed)) return [];
     // Drops entries from an older, incompatible schema (e.g. missing `kind`) instead of crashing.
-    return parsed.filter(isValidGoal);
+    return parsed.filter(isValidGoal).map(normalizeGoal);
   } catch {
     return [];
   }
