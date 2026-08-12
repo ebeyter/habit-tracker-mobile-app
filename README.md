@@ -4,16 +4,25 @@ Exposure AI Academy · Project 9 — React Native + Expo + Local Notifications i
 
 ## Özellikler
 
+### Brief kapsamındaki çekirdek akış
+
 - Sınırsız goal oluşturma, düzenleme, silme ve tamamlama (undo destekli)
-- İki goal türü:
-  - **Tek Seferlik**: zorunlu bitiş tarihi + "X gün önce hatırlat" (tek seferlik reminder)
-  - **Tekrarlayan**: bitiş tarihi yok, her gün seçilen saatte tekrar eden hatırlatma; günlük "bugün tamamlandı" toggle'ı ile işaretlenir (brief'in temel kapsamının ötesinde eklenen bonus özellik)
+- **Tek Seferlik** hedefler: zorunlu bitiş tarihi + "X gün önce hatırlat"
 - `expo-notifications` ile cihaz içi zamanlanmış local notification (remote push yok)
 - Goal edit/delete/complete olduğunda eski notification otomatik cancel/reschedule edilir
 - Active / Overdue / Completed durumları ayrı bölümlerde, net badge'lerle gösterilir
 - Günlük streak: art arda her gün en az bir goal tamamlanırsa +1, boş gün geçerse sıfırlanır (`currentStreak`, `bestStreak`)
 - Tüm veriler (`goals`, `streak`, notification ID'leri) `AsyncStorage`'da saklanır, app kapanıp açılınca kaybolmaz
 - Empty state, form validation, geçmiş reminder zamanı uyarısı ve bildirim izni reddedilme state'i
+
+### Brief'in ötesinde eklenen özellikler
+
+- **Tekrarlayan alışkanlıklar**: bitiş tarihi yok; tekrar kuralı seçilebilir (her gün / haftanın belirli günleri / N günde bir) ve **günde birden fazla hatırlatma saati** kurulabilir
+- **Kategoriler**: 5 hazır kategori + kullanıcının kendi oluşturduğu kategoriler (emoji + isim), ana ekranda filtre chip'leri
+- **Öncelik** (Düşük/Orta/Yüksek) ve **alt görevler** (subtask) — Apple Reminders esintili
+- **Akıllı Plan**: hedef miktar + birim girilirse kalan güne göre günlük tempo önerisi (tamamen local hesaplama, dış API yok)
+- **Maskot (Foksi)**: streak durumuna göre ifade/mesaj değiştiren, ismi–rengi–kıyafeti kişiselleştirilebilen karakter
+- **5 sekme**: Hedefler · Gün Gün (günlük checklist) · Takvim (ay görünümü + local etkinlikler) · Yapılacaklar (hızlı to-do listesi) · Rapor (haftalık/aylık istatistikler)
 
 ## Teknik yapı
 
@@ -28,12 +37,20 @@ Exposure AI Academy · Project 9 — React Native + Expo + Local Notifications i
 Proje yapısı:
 
 ```
-app/                # Expo Router ekranları (index, goal-form modal, _layout)
-components/         # GoalCard, StreakHeader, EmptyState, PermissionBanner, SectionHeader
-context/            # GoalsContext — goals/streak state + storage + notification orkestrasyonu
-lib/                # types, date, storage, streak (saf fonksiyon), notifications, id
+app/(tabs)/         # Hedefler (index), Gün Gün (day), Takvim (calendar),
+                    #   Yapılacaklar (todos), Rapor (reports)
+app/goal-form.tsx   # hedef oluşturma/düzenleme modalı
+components/         # GoalCard, MascotCard, StreakHeader, EmptyState, PermissionBanner, SectionHeader
+context/            # GoalsContext — goals/streak/kategori/todo/etkinlik state + storage + notification
+lib/                # types, date, storage, planner-storage, categories, recurrence,
+                    #   streak, reports, smart-plan, notifications, mascot, id
+scripts/            # generate-mascot-art.mjs (dev-time fal.ai asset üretimi)
 constants/, hooks/  # theme token'ları ve useAppTheme
 ```
+
+> **Not:** `scripts/generate-mascot-art.mjs` maskot görsellerini fal.ai ile üreten, yalnızca
+> geliştirme sırasında elle çalıştırılan bir script'tir. Üretilen PNG'ler `assets/mascot/` altına
+> kaydedilir; uygulama çalışma anında hiçbir external API çağrısı yapmaz.
 
 ## Kurulum
 
@@ -90,6 +107,11 @@ Build tamamlanınca EAS, indirilebilir APK / build linkini verir.
 4. Goal'ı sil → bağlı notification'ın iptal edildiğini doğrula.
 5. Uygulamayı tamamen kapatıp aç → goals, streak ve notification ID'lerinin korunduğunu doğrula.
 6. Deadline'ı geçmiş bir goal ile Overdue state'ini, boş listede Empty state'i kontrol et.
+7. Tekrarlayan bir alışkanlık oluştur (ör. "haftanın günleri: Pzt/Çar/Cum", iki hatırlatma saati) →
+   Takvim sekmesinde yalnızca o günlerin işaretlendiğini, Gün Gün'de geçmiş günlerin doldurulabildiğini
+   ve gelecek günlerin kilitli olduğunu doğrula.
+8. Kendi kategorini oluştur, bir hedefe ata, sonra kategoriye uzun basıp sil → hedefin "Genel"e
+   düştüğünü doğrula.
 
 ## Notlar
 
