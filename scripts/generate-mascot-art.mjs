@@ -40,6 +40,7 @@ async function generate(pose) {
       num_inference_steps: 4,
       num_images: 1,
       enable_safety_checker: true,
+      output_format: 'png',
     }),
   });
 
@@ -55,6 +56,17 @@ async function generate(pose) {
 
   const imgRes = await fetch(imageUrl);
   const buffer = Buffer.from(await imgRes.arrayBuffer());
+
+  // Android's AAPT rejects a JPEG that merely carries a .png extension, so refuse to write
+  // one — Metro and iOS tolerate the mismatch and the failure only surfaces at build time.
+  const isPng = buffer.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]));
+  if (!isPng) {
+    throw new Error(
+      `fal.ai returned a non-PNG image for "${pose.id}". Convert it before committing, e.g.\n` +
+        `  sips -s format png -Z 256 <file> --out assets/mascot/${pose.id}.png`
+    );
+  }
+
   const outPath = path.join(OUT_DIR, `${pose.id}.png`);
   await writeFile(outPath, buffer);
   console.log(`Saved ${outPath}`);
