@@ -1,50 +1,72 @@
 /**
  * Design tokens for the app: colors (light/dark), spacing, radius and typography.
+ *
+ * The app is dark-first: the neon purple/pink palette is designed against a deep
+ * indigo ground, and the light scheme is a softened counterpart of the same hues.
  */
 
 import { Platform } from 'react-native';
 
-const tintColorLight = '#5B5BD6';
-const tintColorDark = '#8B8BF5';
+const tintDark = '#A855F7';
+const tintLight = '#7C3AED';
 
 export const Colors = {
   light: {
-    text: '#11181C',
-    textMuted: '#5C6670',
-    background: '#F5F6FA',
+    text: '#1B1030',
+    textMuted: '#6B6486',
+    background: '#F6F2FF',
     surface: '#FFFFFF',
-    border: '#E4E7ED',
-    tint: tintColorLight,
-    icon: '#687076',
-    tabIconDefault: '#687076',
-    tabIconSelected: tintColorLight,
-    success: '#1E9E63',
-    successMuted: '#E4F7EE',
+    surfaceAlt: '#F0E9FF',
+    border: '#E4DBF7',
+    tint: tintLight,
+    accent: '#EC4899',
+    icon: '#6B6486',
+    tabIconDefault: '#9B93B4',
+    tabIconSelected: tintLight,
+    success: '#12A150',
+    successMuted: '#DEF7E9',
     danger: '#E5484D',
     dangerMuted: '#FDECEC',
-    warning: '#F5A524',
-    warningMuted: '#FEF3DD',
-    streak: '#FF7A45',
+    warning: '#D97706',
+    warningMuted: '#FEF0DC',
+    streak: '#F5620F',
+    gradientStart: '#7C3AED',
+    gradientEnd: '#EC4899',
   },
   dark: {
-    text: '#ECEDEE',
-    textMuted: '#9BA1A6',
-    background: '#0E0F13',
-    surface: '#1A1B20',
-    border: '#2A2C33',
-    tint: tintColorDark,
-    icon: '#9BA1A6',
-    tabIconDefault: '#9BA1A6',
-    tabIconSelected: tintColorDark,
+    text: '#F4F1FF',
+    textMuted: '#A79FC4',
+    background: '#120B23',
+    surface: '#1E1438',
+    surfaceAlt: '#2A1C4D',
+    border: '#33245C',
+    tint: tintDark,
+    accent: '#F472B6',
+    icon: '#A79FC4',
+    tabIconDefault: '#7D74A0',
+    tabIconSelected: tintDark,
     success: '#3DD68C',
-    successMuted: '#123324',
+    successMuted: '#123A28',
     danger: '#FF6369',
-    dangerMuted: '#3A1618',
+    dangerMuted: '#41171C',
     warning: '#FFC069',
-    warningMuted: '#3A2A0F',
-    streak: '#FF9466',
+    warningMuted: '#402C12',
+    streak: '#FF8A4C',
+    gradientStart: '#A855F7',
+    gradientEnd: '#F472B6',
   },
 };
+
+/** Per-category accent colors so lists read as more than one flat surface. */
+export const CategoryColors: Record<string, string> = {
+  genel: '#A855F7',
+  saglik: '#3DD68C',
+  egitim: '#38BDF8',
+  is: '#FBBF24',
+  kisisel: '#F472B6',
+};
+
+export const FALLBACK_CATEGORY_COLOR = '#A855F7';
 
 export const Spacing = {
   xs: 4,
@@ -56,9 +78,9 @@ export const Spacing = {
 };
 
 export const Radius = {
-  sm: 8,
-  md: 14,
-  lg: 20,
+  sm: 10,
+  md: 16,
+  lg: 22,
   pill: 999,
 };
 

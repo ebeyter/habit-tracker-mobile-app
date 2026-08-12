@@ -1,3 +1,4 @@
+import Ionicons from '@expo/vector-icons/Ionicons';
 import { router } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
@@ -89,6 +90,9 @@ export default function GoalsScreen() {
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={[styles.header, { paddingHorizontal: spacing.lg, paddingTop: spacing.md }]}>
         <Text style={[styles.title, { color: colors.text }]}>Hedeflerim</Text>
+        <Pressable onPress={() => router.push('/settings')} hitSlop={12}>
+          <Ionicons name="settings-outline" size={24} color={colors.textMuted} />
+        </Pressable>
       </View>
 
       <ScrollView
@@ -263,6 +267,9 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingBottom: 4,
   },
   title: {

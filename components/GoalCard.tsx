@@ -2,7 +2,7 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
-import { categoryEmoji } from '@/lib/categories';
+import { categoryColor, categoryEmoji } from '@/lib/categories';
 import { dayKey, daysUntil, formatDate, formatTimeOfDay, isPastDay } from '@/lib/date';
 import { describeRecurrence, isDueOn } from '@/lib/recurrence';
 import { suggestPlan } from '@/lib/smart-plan';
@@ -30,6 +30,7 @@ export function GoalCard({
   const { colors, spacing, radius } = useAppTheme();
   const { categories } = useGoals();
   const emoji = categoryEmoji(categories, goal.category);
+  const accent = categoryColor(goal.category);
 
   const prioritySymbol =
     goal.priority === 'normal' ? null : PRIORITIES.find((p) => p.id === goal.priority)?.symbol;
@@ -71,7 +72,7 @@ export function GoalCard({
       <View
         style={[
           styles.card,
-          { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm },
+          { backgroundColor: colors.surface, borderRadius: radius.md, padding: spacing.md, marginBottom: spacing.sm, borderLeftWidth: 5, borderLeftColor: accent },
         ]}
       >
         <View style={styles.headerRow}>
@@ -132,6 +133,8 @@ export function GoalCard({
           borderRadius: radius.md,
           padding: spacing.md,
           marginBottom: spacing.sm,
+          borderLeftWidth: 5,
+          borderLeftColor: accent,
           opacity: goal.status === 'completed' ? 0.75 : 1,
         },
       ]}

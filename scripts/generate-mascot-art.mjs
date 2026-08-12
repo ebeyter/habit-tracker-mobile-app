@@ -1,7 +1,7 @@
-// Dev-time only: generates the 3 mascot pose illustrations via fal.ai and saves
-// them into assets/mascot/. Never called at runtime by the app itself.
+// Dev-time only: generates the 3D mascot renders via fal.ai (one per animal x mood)
+// and saves them into assets/mascot/. Never called at runtime by the app itself.
 //
-// Usage: node --env-file=.env scripts/generate-mascot-art.mjs
+// Usage: node --env-file=.env scripts/generate-mascot-art.mjs [animalId ...]
 
 import { Buffer } from 'node:buffer';
 import { mkdir, writeFile } from 'node:fs/promises';
@@ -17,15 +17,36 @@ if (!FAL_KEY) {
 const OUT_DIR = path.join(process.cwd(), 'assets', 'mascot');
 
 const STYLE =
-  'cute flat vector illustration, friendly orange fox mascot character, big round eyes, ' +
-  'simple flat colors, thick clean black outlines, sticker style, centered composition, ' +
-  'solid plain white background, no text, no shadow, no watermark';
+  '3D rendered cute cartoon mascot character, Pixar animation style, glossy soft plastic toy look, ' +
+  'big expressive friendly eyes, soft studio lighting, subtle rim light, full body, centered composition, ' +
+  'solid plain white background, no text, no watermark';
 
-const POSES = [
-  { id: 'neutral', prompt: `${STYLE}, calm neutral expression, sitting pose` },
-  { id: 'happy', prompt: `${STYLE}, joyful big smile, cheering pose with paws up` },
-  { id: 'sad', prompt: `${STYLE}, sad droopy expression, slouched pose, one small tear` },
+const ANIMALS = [
+  { id: 'owl', subject: 'wise friendly owl wearing tiny round glasses' },
+  { id: 'dog', subject: 'loyal happy golden puppy' },
+  { id: 'fox', subject: 'clever orange fox' },
+  { id: 'cat', subject: 'sweet fluffy grey cat' },
+  { id: 'panda', subject: 'chubby cheerful panda' },
+  { id: 'rabbit', subject: 'soft white rabbit with long ears' },
 ];
+
+const MOODS = [
+  { id: 'neutral', pose: 'calm friendly expression, sitting upright, small encouraging smile' },
+  { id: 'happy', pose: 'joyful big smile, cheering with both arms raised, celebrating' },
+  { id: 'sad', pose: 'sad droopy expression, ears down, slouched, one small tear' },
+];
+
+function buildJobs(filterIds) {
+  const animals = filterIds.length
+    ? ANIMALS.filter((a) => filterIds.includes(a.id))
+    : ANIMALS;
+  return animals.flatMap((animal) =>
+    MOODS.map((mood) => ({
+      id: `${animal.id}-${mood.id}`,
+      prompt: `${STYLE}, a ${animal.subject}, ${mood.pose}`,
+    }))
+  );
+}
 
 async function generate(pose) {
   const res = await fetch('https://fal.run/fal-ai/flux/schnell', {
@@ -73,8 +94,9 @@ async function generate(pose) {
 }
 
 await mkdir(OUT_DIR, { recursive: true });
-for (const pose of POSES) {
-  console.log(`Generating "${pose.id}"...`);
-  await generate(pose);
+const jobs = buildJobs(process.argv.slice(2));
+for (const [i, job] of jobs.entries()) {
+  console.log(`[${i + 1}/${jobs.length}] Generating "${job.id}"...`);
+  await generate(job);
 }
 console.log('Done.');
