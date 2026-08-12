@@ -12,7 +12,7 @@ import { StreakHeader } from '@/components/StreakHeader';
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { isPastDay } from '@/lib/date';
-import { CATEGORIES, type Goal, type GoalCategory, type OneTimeGoal, type RecurringGoal } from '@/lib/types';
+import type { Goal, GoalCategory, OneTimeGoal, RecurringGoal } from '@/lib/types';
 
 type CategoryFilter = GoalCategory | 'all';
 
@@ -28,6 +28,7 @@ export default function GoalsScreen() {
     toggleRecurringToday,
     toggleSubtask,
     deleteGoal,
+    categories,
   } = useGoals();
 
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
@@ -91,6 +92,7 @@ export default function GoalsScreen() {
       </View>
 
       <ScrollView
+        style={styles.flex}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl * 2 }}
         showsVerticalScrollIndicator={false}
       >
@@ -114,7 +116,7 @@ export default function GoalsScreen() {
               active={categoryFilter === 'all'}
               onPress={() => setCategoryFilter('all')}
             />
-            {CATEGORIES.map((c) => (
+            {categories.map((c) => (
               <CategoryChip
                 key={c.id}
                 label={c.label}

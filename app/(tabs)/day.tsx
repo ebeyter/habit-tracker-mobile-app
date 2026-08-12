@@ -5,17 +5,14 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
+import { categoryEmoji } from '@/lib/categories';
 import { addDays, dayKey, formatDayLabel, isSameDay, startOfDay, today } from '@/lib/date';
 import { isDueOn } from '@/lib/recurrence';
-import { CATEGORIES, type OneTimeGoal, type RecurringGoal } from '@/lib/types';
-
-function categoryEmoji(id: string): string {
-  return CATEGORIES.find((c) => c.id === id)?.emoji ?? '🎯';
-}
+import type { OneTimeGoal, RecurringGoal } from '@/lib/types';
 
 export default function DayScreen() {
   const { colors, spacing, radius } = useAppTheme();
-  const { goals, toggleRecurringOnDate } = useGoals();
+  const { goals, categories, toggleRecurringOnDate } = useGoals();
   const [selectedDate, setSelectedDate] = useState(() => today());
 
   const key = dayKey(selectedDate);
@@ -70,6 +67,7 @@ export default function DayScreen() {
       </View>
 
       <ScrollView
+        style={styles.flex}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}
         showsVerticalScrollIndicator={false}
       >
@@ -137,7 +135,7 @@ export default function DayScreen() {
                     { color: colors.text, textDecorationLine: done ? 'line-through' : 'none' },
                   ]}
                 >
-                  {categoryEmoji(habit.category)} {habit.title}
+                  {categoryEmoji(categories, habit.category)} {habit.title}
                 </Text>
               </Pressable>
             );
@@ -168,7 +166,7 @@ export default function DayScreen() {
                   color={goal.status === 'completed' ? colors.success : colors.warning}
                 />
                 <Text style={[styles.habitTitle, { color: colors.text }]}>
-                  {categoryEmoji(goal.category)} {goal.title}
+                  {categoryEmoji(categories, goal.category)} {goal.title}
                 </Text>
               </View>
             ))}

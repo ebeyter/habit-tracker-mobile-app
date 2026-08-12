@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import type { ReactNode } from 'react';
 
+import { allCategories, getCustomCategories, saveCustomCategories } from '@/lib/categories';
 import { dayKey } from '@/lib/date';
 import { generateId } from '@/lib/id';
 import {
@@ -14,7 +15,7 @@ import {
 } from '@/lib/notifications';
 import { getGoals, getStreak, saveGoals, saveStreak } from '@/lib/storage';
 import { computeStreak } from '@/lib/streak';
-import type { Goal, NewGoalInput, StreakData } from '@/lib/types';
+import type { Category, Goal, NewGoalInput, StreakData } from '@/lib/types';
 
 type SaveOutcome = { goal: Goal; scheduleReason: ScheduleResult['reason'] };
 
@@ -31,6 +32,9 @@ type GoalsContextValue = {
   toggleRecurringToday: (id: string) => Promise<void>;
   toggleRecurringOnDate: (id: string, date: Date) => Promise<void>;
   toggleSubtask: (goalId: string, subtaskId: string) => Promise<void>;
+  categories: Category[];
+  addCategory: (label: string, emoji: string) => Promise<Category>;
+  deleteCategory: (id: string) => Promise<void>;
   refreshPermission: () => Promise<void>;
 };
 
@@ -44,6 +48,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
     lastCompletionDate: null,
   });
   const [permissionStatus, setPermissionStatus] = useState<PermissionStatus>('undetermined');
+  const [customCategories, setCustomCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
 
   const goalsRef = useRef<Goal[]>([]);
@@ -54,14 +59,16 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     configureNotificationHandler();
     (async () => {
-      const [loadedGoals, status, cachedStreak] = await Promise.all([
+      const [loadedGoals, status, cachedStreak, loadedCategories] = await Promise.all([
         getGoals(),
         getPermissionStatus(),
         getStreak(),
+        getCustomCategories(),
       ]);
       goalsRef.current = loadedGoals;
       setGoals(loadedGoals);
       setPermissionStatus(status);
+      setCustomCategories(loadedCategories);
       // Recompute from goals as the source of truth; falls back to cached value only if goals are empty.
       const freshStreak = computeStreak(loadedGoals);
       setStreak(loadedGoals.length ? freshStreak : cachedStreak ?? freshStreak);
@@ -109,7 +116,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
             ...base,
             kind: 'recurring',
             recurrence: input.recurrence,
-            reminderTime: input.reminderTime,
+            reminderTimes: input.reminderTimes,
             completedDates: [],
           };
 
@@ -149,7 +156,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
       };
     } else if (input.kind === 'recurring' && existing.kind === 'recurring') {
       const scheduleRelevantChange =
-        existing.reminderTime !== input.reminderTime ||
+        JSON.stringify(existing.reminderTimes) !== JSON.stringify(input.reminderTimes) ||
         JSON.stringify(existing.recurrence) !== JSON.stringify(input.recurrence);
       if (scheduleRelevantChange) {
         const res = await rescheduleGoalReminder({ ...input, notificationIds: existing.notificationIds });
@@ -165,7 +172,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
         priority: input.priority,
         subtasks: input.subtasks,
         recurrence: input.recurrence,
-        reminderTime: input.reminderTime,
+        reminderTimes: input.reminderTimes,
         notificationIds,
       };
     } else {
@@ -245,6 +252,24 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
     await commit(goalsRef.current.map((g) => (g.id === goalId ? updated : g)));
   }
 
+  async function addCategory(label: string, emoji: string): Promise<Category> {
+    const category: Category = { id: generateId(), label: label.trim(), emoji, custom: true };
+    const next = [...customCategories, category];
+    setCustomCategories(next);
+    await saveCustomCategories(next);
+    return category;
+  }
+
+  /** Goals in a deleted category fall back to "genel" so nothing ends up orphaned. */
+  async function deleteCategory(id: string) {
+    const next = customCategories.filter((c) => c.id !== id);
+    setCustomCategories(next);
+    await saveCustomCategories(next);
+    if (goalsRef.current.some((g) => g.category === id)) {
+      await commit(goalsRef.current.map((g) => (g.category === id ? { ...g, category: 'genel' } : g)));
+    }
+  }
+
   async function refreshPermission() {
     setPermissionStatus(await getPermissionStatus());
   }
@@ -263,10 +288,13 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
       toggleRecurringToday,
       toggleRecurringOnDate,
       toggleSubtask,
+      categories: allCategories(customCategories),
+      addCategory,
+      deleteCategory,
       refreshPermission,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [goals, streak, permissionStatus, loading]
+    [goals, streak, permissionStatus, loading, customCategories]
   );
 
   return <GoalsContext.Provider value={value}>{children}</GoalsContext.Provider>;

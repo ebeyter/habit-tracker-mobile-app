@@ -1,9 +1,12 @@
 export type GoalStatus = 'active' | 'completed';
 export type GoalKind = 'onetime' | 'recurring';
-export type GoalCategory = 'genel' | 'saglik' | 'egitim' | 'is' | 'kisisel';
+/** Ids of the built-in categories plus any the user creates, so this stays an open string type. */
+export type GoalCategory = string;
 export type Priority = 'low' | 'normal' | 'high';
 
-export const CATEGORIES: { id: GoalCategory; label: string; emoji: string }[] = [
+export type Category = { id: GoalCategory; label: string; emoji: string; custom?: boolean };
+
+export const DEFAULT_CATEGORIES: Category[] = [
   { id: 'genel', label: 'Genel', emoji: '🎯' },
   { id: 'saglik', label: 'Sağlık', emoji: '💪' },
   { id: 'egitim', label: 'Eğitim', emoji: '📚' },
@@ -59,8 +62,8 @@ export type OneTimeGoal = BaseGoal & {
 export type RecurringGoal = BaseGoal & {
   kind: 'recurring';
   recurrence: Recurrence;
-  /** "HH:mm" local time the reminder fires at on due days */
-  reminderTime: string;
+  /** "HH:mm" local times the reminder fires at on due days — one entry per repetition that day */
+  reminderTimes: string[];
   /** yyyy-mm-dd day keys on which this habit was marked done */
   completedDates: string[];
 };
@@ -92,7 +95,7 @@ export type NewOneTimeGoalInput = NewGoalShared & {
 export type NewRecurringGoalInput = NewGoalShared & {
   kind: 'recurring';
   recurrence: Recurrence;
-  reminderTime: string;
+  reminderTimes: string[];
 };
 
 export type NewGoalInput = NewOneTimeGoalInput | NewRecurringGoalInput;

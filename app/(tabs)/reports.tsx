@@ -8,10 +8,10 @@ import { buildReport, type ReportRange } from '@/lib/reports';
 
 export default function ReportsScreen() {
   const { colors, spacing, radius } = useAppTheme();
-  const { goals, streak } = useGoals();
+  const { goals, streak, categories } = useGoals();
   const [range, setRange] = useState<ReportRange>('week');
 
-  const report = useMemo(() => buildReport(goals, range), [goals, range]);
+  const report = useMemo(() => buildReport(goals, categories, range), [goals, categories, range]);
   const maxCount = Math.max(1, ...report.days.map((d) => d.count));
   const consistency = Math.round((report.activeDays / report.totalDays) * 100);
 
@@ -22,6 +22,7 @@ export default function ReportsScreen() {
       </View>
 
       <ScrollView
+        style={styles.flex}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}
         showsVerticalScrollIndicator={false}
       >

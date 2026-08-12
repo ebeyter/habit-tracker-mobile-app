@@ -94,20 +94,23 @@ async function scheduleOneTimeReminder(
 }
 
 async function scheduleRecurringReminder(
-  goal: Pick<Extract<NewGoalInput, { kind: 'recurring' }>, 'title' | 'reminderTime' | 'recurrence'>
+  goal: Pick<Extract<NewGoalInput, { kind: 'recurring' }>, 'title' | 'reminderTimes' | 'recurrence'>
 ): Promise<ScheduleResult> {
   const status = await ensurePermission();
   if (status !== 'granted') {
     return { notificationIds: [], reason: 'permission' };
   }
 
-  const [hour, minute] = goal.reminderTime.split(':').map(Number);
   const content = {
     title: 'Alışkanlık hatırlatması',
     body: `"${goal.title}" için bugünü unutma!`,
   };
 
-  const ids = await scheduleTriggersFor(goal.recurrence, content, hour, minute);
+  const ids: string[] = [];
+  for (const time of goal.reminderTimes) {
+    const [hour, minute] = time.split(':').map(Number);
+    ids.push(...(await scheduleTriggersFor(goal.recurrence, content, hour, minute)));
+  }
   return { notificationIds: ids, reason: null };
 }
 

@@ -1,14 +1,12 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
+import { categoryEmoji } from '@/lib/categories';
 import { dayKey, daysUntil, formatDate, formatTimeOfDay, isPastDay } from '@/lib/date';
 import { describeRecurrence, isDueOn } from '@/lib/recurrence';
 import { suggestPlan } from '@/lib/smart-plan';
-import { CATEGORIES, PRIORITIES, type Goal } from '@/lib/types';
-
-function categoryEmoji(id: Goal['category']): string {
-  return CATEGORIES.find((c) => c.id === id)?.emoji ?? '🎯';
-}
+import { PRIORITIES, type Goal } from '@/lib/types';
 
 type Props = {
   goal: Goal;
@@ -30,6 +28,8 @@ export function GoalCard({
   onDelete,
 }: Props) {
   const { colors, spacing, radius } = useAppTheme();
+  const { categories } = useGoals();
+  const emoji = categoryEmoji(categories, goal.category);
 
   const prioritySymbol =
     goal.priority === 'normal' ? null : PRIORITIES.find((p) => p.id === goal.priority)?.symbol;
@@ -76,7 +76,7 @@ export function GoalCard({
       >
         <View style={styles.headerRow}>
           <Text style={[styles.title, { color: colors.text }]}>
-            {categoryEmoji(goal.category)} {goal.title}
+            {emoji} {goal.title}
             {prioritySymbol ? <Text style={{ color: colors.danger }}> {prioritySymbol}</Text> : null}
           </Text>
           <View style={[styles.badge, { backgroundColor: badge.bg }]}>
@@ -91,7 +91,7 @@ export function GoalCard({
         )}
 
         <Text style={[styles.meta, { color: colors.textMuted }]}>
-          {describeRecurrence(goal.recurrence)} · {formatTimeOfDay(goal.reminderTime)} ·{' '}
+          {describeRecurrence(goal.recurrence)} · {goal.reminderTimes.map(formatTimeOfDay).join(", ")} ·{' '}
           {goal.completedDates.length} kez tamamlandı
           {goal.notificationIds.length === 0 ? ' · bildirim yok' : ''}
         </Text>
@@ -143,7 +143,7 @@ export function GoalCard({
             { color: colors.text, textDecorationLine: goal.status === 'completed' ? 'line-through' : 'none' },
           ]}
         >
-          {categoryEmoji(goal.category)} {goal.title}
+          {emoji} {goal.title}
           {prioritySymbol ? <Text style={{ color: colors.danger }}> {prioritySymbol}</Text> : null}
         </Text>
         <View style={[styles.badge, { backgroundColor: badge.bg }]}>

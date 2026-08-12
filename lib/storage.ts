@@ -20,9 +20,13 @@ function normalizeGoal(g: Goal): Goal {
     subtasks: g.subtasks ?? [],
     notificationIds: g.notificationIds ?? (legacyNotificationId ? [legacyNotificationId] : []),
   };
-  return base.kind === 'recurring'
-    ? { ...base, recurrence: base.recurrence ?? { type: 'daily' } }
-    : base;
+  if (base.kind !== 'recurring') return base;
+  const legacyTime = (base as { reminderTime?: string }).reminderTime;
+  return {
+    ...base,
+    recurrence: base.recurrence ?? { type: 'daily' },
+    reminderTimes: base.reminderTimes ?? (legacyTime ? [legacyTime] : ['09:00']),
+  };
 }
 
 export async function getGoals(): Promise<Goal[]> {

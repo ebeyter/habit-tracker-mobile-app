@@ -16,12 +16,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
+import { categoryEmoji } from '@/lib/categories';
 import { addDays, formatDate, formatTimeOfDay, hhmmToDate, startOfDay, timeToHHMM, today } from '@/lib/date';
 import { generateId } from '@/lib/id';
 import { WEEKDAY_LABELS } from '@/lib/recurrence';
 import { suggestPlan } from '@/lib/smart-plan';
 import {
-  CATEGORIES,
   PRIORITIES,
   type GoalCategory,
   type GoalKind,
@@ -34,6 +34,7 @@ import {
 const REMINDER_MIN = 0;
 const REMINDER_MAX = 30;
 const DEFAULT_REMINDER_TIME = '09:00';
+const CATEGORY_EMOJI_CHOICES = ['🎯', '💡', '🎨', '🎵', '🏃', '🍳', '💰', '✈️', '🐾', '🧘'];
 
 const PRESET_RECURRING: { title: string; category: GoalCategory }[] = [
   { title: 'Su iç', category: 'saglik' },
@@ -46,7 +47,7 @@ const PRESET_RECURRING: { title: string; category: GoalCategory }[] = [
 export default function GoalFormScreen() {
   const { colors, spacing, radius } = useAppTheme();
   const { id } = useLocalSearchParams<{ id?: string }>();
-  const { goals, addGoal, updateGoal } = useGoals();
+  const { goals, addGoal, updateGoal, categories, addCategory, deleteCategory } = useGoals();
 
   const editingGoal = useMemo(() => goals.find((g) => g.id === id), [goals, id]);
   const isEditing = !!editingGoal;
@@ -66,9 +67,12 @@ export default function GoalFormScreen() {
   const [reminderDaysBefore, setReminderDaysBefore] = useState(1);
   const [targetAmount, setTargetAmount] = useState('');
   const [targetUnit, setTargetUnit] = useState('');
-  const [reminderTime, setReminderTime] = useState(DEFAULT_REMINDER_TIME);
+  const [reminderTimes, setReminderTimes] = useState<string[]>([DEFAULT_REMINDER_TIME]);
+  const [editingTimeIndex, setEditingTimeIndex] = useState<number | null>(null);
   const [showIosDatePicker, setShowIosDatePicker] = useState(false);
-  const [showIosTimePicker, setShowIosTimePicker] = useState(false);
+  const [newCategoryOpen, setNewCategoryOpen] = useState(false);
+  const [newCategoryLabel, setNewCategoryLabel] = useState('');
+  const [newCategoryEmoji, setNewCategoryEmoji] = useState(CATEGORY_EMOJI_CHOICES[0]);
   const [titleError, setTitleError] = useState<string | null>(null);
   const [deadlineError, setDeadlineError] = useState<string | null>(null);
   const [recurrenceError, setRecurrenceError] = useState<string | null>(null);
@@ -88,7 +92,7 @@ export default function GoalFormScreen() {
       setTargetAmount(editingGoal.targetAmount ? String(editingGoal.targetAmount) : '');
       setTargetUnit(editingGoal.targetUnit ?? '');
     } else {
-      setReminderTime(editingGoal.reminderTime);
+      setReminderTimes(editingGoal.reminderTimes);
       setRecurrenceType(editingGoal.recurrence.type);
       if (editingGoal.recurrence.type === 'weekdays') setWeekdays(editingGoal.recurrence.days);
       if (editingGoal.recurrence.type === 'everyN') setEveryN(editingGoal.recurrence.n);
@@ -135,18 +139,61 @@ export default function GoalFormScreen() {
     }
   }
 
-  function openTimePicker() {
+  function setTimeAt(index: number, value: string) {
+    setReminderTimes((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      return [...new Set(next)].sort();
+    });
+  }
+
+  function openTimePicker(index: number) {
     if (Platform.OS === 'android') {
       DateTimePickerAndroid.open({
-        value: hhmmToDate(reminderTime),
+        value: hhmmToDate(reminderTimes[index]),
         mode: 'time',
         onChange: (_event, selected) => {
-          if (selected) setReminderTime(timeToHHMM(selected));
+          if (selected) setTimeAt(index, timeToHHMM(selected));
         },
       });
     } else {
-      setShowIosTimePicker((v) => !v);
+      setEditingTimeIndex((v) => (v === index ? null : index));
     }
+  }
+
+  function addReminderTime() {
+    setReminderTimes((prev) => {
+      // offer the next free hour so the new row is not a duplicate of an existing one
+      const used = new Set(prev);
+      for (let h = 7; h <= 23; h++) {
+        const candidate = `${String(h).padStart(2, '0')}:00`;
+        if (!used.has(candidate)) return [...prev, candidate].sort();
+      }
+      return prev;
+    });
+  }
+
+  async function handleAddCategory() {
+    const label = newCategoryLabel.trim();
+    if (!label) return;
+    const created = await addCategory(label, newCategoryEmoji);
+    setCategory(created.id);
+    setNewCategoryLabel('');
+    setNewCategoryOpen(false);
+  }
+
+  function confirmDeleteCategory(id: string, label: string) {
+    Alert.alert('Kategoriyi sil', `"${label}" silinsin mi? Bu kategorideki hedefler Genel'e taşınır.`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      {
+        text: 'Sil',
+        style: 'destructive',
+        onPress: async () => {
+          await deleteCategory(id);
+          if (category === id) setCategory('genel');
+        },
+      },
+    ]);
   }
 
   function adjustReminder(delta: number) {
@@ -202,7 +249,7 @@ export default function GoalFormScreen() {
               ...shared,
               kind: 'recurring' as const,
               recurrence: buildRecurrence(),
-              reminderTime,
+              reminderTimes,
             };
 
       const result = isEditing ? await updateGoal(editingGoal!.id, input) : await addGoal(input);
@@ -282,7 +329,7 @@ export default function GoalFormScreen() {
                     style={[styles.chip, { backgroundColor: colors.border, borderRadius: radius.pill }]}
                   >
                     <Text style={[styles.chipText, { color: colors.text }]}>
-                      {CATEGORIES.find((c) => c.id === preset.category)?.emoji} {preset.title}
+                      {categoryEmoji(categories, preset.category)} {preset.title}
                     </Text>
                   </Pressable>
                 ))}
@@ -294,12 +341,13 @@ export default function GoalFormScreen() {
             Kategori
           </Text>
           <View style={styles.chipRow}>
-            {CATEGORIES.map((c) => {
+            {categories.map((c) => {
               const active = category === c.id;
               return (
                 <Pressable
                   key={c.id}
                   onPress={() => setCategory(c.id)}
+                  onLongPress={() => c.custom && confirmDeleteCategory(c.id, c.label)}
                   style={[
                     styles.chip,
                     {
@@ -314,7 +362,62 @@ export default function GoalFormScreen() {
                 </Pressable>
               );
             })}
+            <Pressable
+              onPress={() => setNewCategoryOpen((v) => !v)}
+              style={[styles.chip, { borderRadius: radius.pill, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.tint }]}
+            >
+              <Text style={[styles.chipText, { color: colors.tint }]}>+ Yeni</Text>
+            </Pressable>
           </View>
+          <Text style={[styles.hint, { color: colors.textMuted }]}>
+            Kendi kategorini eklemek için &quot;+ Yeni&quot;ye, silmek için üzerine basılı tut.
+          </Text>
+
+          {newCategoryOpen && (
+            <View
+              style={[
+                styles.newCategoryBox,
+                { backgroundColor: colors.surface, borderRadius: radius.md, borderColor: colors.border },
+              ]}
+            >
+              <View style={styles.chipRow}>
+                {CATEGORY_EMOJI_CHOICES.map((e) => (
+                  <Pressable
+                    key={e}
+                    onPress={() => setNewCategoryEmoji(e)}
+                    style={[
+                      styles.emojiChoice,
+                      {
+                        borderRadius: radius.pill,
+                        backgroundColor: newCategoryEmoji === e ? colors.tint : colors.border,
+                      },
+                    ]}
+                  >
+                    <Text style={{ fontSize: 18 }}>{e}</Text>
+                  </Pressable>
+                ))}
+              </View>
+              <View style={[styles.row, { gap: spacing.sm, marginTop: spacing.sm }]}>
+                <TextInput
+                  value={newCategoryLabel}
+                  onChangeText={setNewCategoryLabel}
+                  placeholder="Kategori adı"
+                  placeholderTextColor={colors.textMuted}
+                  onSubmitEditing={handleAddCategory}
+                  style={[
+                    styles.input,
+                    { flex: 1, backgroundColor: colors.background, color: colors.text, borderRadius: radius.sm, borderColor: colors.border },
+                  ]}
+                />
+                <Pressable
+                  onPress={handleAddCategory}
+                  style={[styles.addSubtaskButton, { backgroundColor: colors.tint, borderRadius: radius.sm }]}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '700' }}>Ekle</Text>
+                </Pressable>
+              </View>
+            </View>
+          )}
 
           <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>Öncelik</Text>
           <View style={styles.chipRow}>
@@ -529,30 +632,48 @@ export default function GoalFormScreen() {
               )}
 
               <Text style={[styles.label, { color: colors.textMuted, marginTop: spacing.md }]}>
-                Hatırlatma Saati
+                Hatırlatma Saatleri ({reminderTimes.length} kez/gün)
               </Text>
-              <Pressable
-                onPress={openTimePicker}
-                style={[
-                  styles.dateButton,
-                  { backgroundColor: colors.surface, borderRadius: radius.sm, borderColor: colors.border },
-                ]}
-              >
-                <Text style={{ color: colors.text }}>{formatTimeOfDay(reminderTime)}</Text>
-              </Pressable>
-              {Platform.OS === 'ios' && showIosTimePicker && (
+              {reminderTimes.map((time, index) => (
+                <View key={time} style={[styles.row, { gap: spacing.sm, marginBottom: spacing.sm }]}>
+                  <Pressable
+                    onPress={() => openTimePicker(index)}
+                    style={[
+                      styles.dateButton,
+                      { flex: 1, backgroundColor: colors.surface, borderRadius: radius.sm, borderColor: colors.border },
+                    ]}
+                  >
+                    <Text style={{ color: colors.text }}>{formatTimeOfDay(time)}</Text>
+                  </Pressable>
+                  {reminderTimes.length > 1 && (
+                    <Pressable
+                      onPress={() => setReminderTimes((prev) => prev.filter((_, i) => i !== index))}
+                      style={[styles.addSubtaskButton, { backgroundColor: colors.dangerMuted, borderRadius: radius.sm }]}
+                    >
+                      <Text style={{ color: colors.danger, fontWeight: '700' }}>Sil</Text>
+                    </Pressable>
+                  )}
+                </View>
+              ))}
+              {Platform.OS === 'ios' && editingTimeIndex !== null && (
                 <DateTimePicker
-                  value={hhmmToDate(reminderTime)}
+                  value={hhmmToDate(reminderTimes[editingTimeIndex])}
                   mode="time"
                   display="spinner"
                   onChange={(_event, selected) => {
-                    if (selected) setReminderTime(timeToHHMM(selected));
+                    if (selected) setTimeAt(editingTimeIndex, timeToHHMM(selected));
                   }}
                 />
               )}
+              <Pressable
+                onPress={addReminderTime}
+                style={[styles.chip, { alignSelf: 'flex-start', borderRadius: radius.pill, backgroundColor: colors.border }]}
+              >
+                <Text style={[styles.chipText, { color: colors.text }]}>+ Saat Ekle</Text>
+              </Pressable>
               <Text style={[styles.hint, { color: colors.textMuted }]}>
-                Bitiş tarihi yok; bu hedef seçtiğin sıklıkta belirtilen saatte hatırlatılır ve tamamlandığı
-                gün seriye (streak) sayılır.
+                Bitiş tarihi yok; bu hedef seçtiğin sıklıkta ve saatlerde hatırlatılır, tamamlandığı gün
+                seriye (streak) sayılır.
               </Text>
             </>
           )}
@@ -689,6 +810,17 @@ const styles = StyleSheet.create({
   dayChip: {
     paddingHorizontal: 14,
     paddingVertical: 8,
+  },
+  newCategoryBox: {
+    borderWidth: 1,
+    padding: 12,
+    marginTop: 8,
+  },
+  emojiChoice: {
+    width: 38,
+    height: 38,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   subtaskRow: {
     flexDirection: 'row',

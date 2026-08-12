@@ -1,6 +1,6 @@
 import { addDays, dayKey, today } from './date';
 import { completionDayKeys } from './streak';
-import { CATEGORIES, type Goal, type GoalCategory } from './types';
+import type { Category, Goal, GoalCategory } from './types';
 
 export type ReportRange = 'week' | 'month';
 
@@ -23,7 +23,7 @@ function completionsForGoalOnDay(goal: Goal, key: string): number {
     : 0;
 }
 
-export function buildReport(goals: Goal[], range: ReportRange): Report {
+export function buildReport(goals: Goal[], categories: Category[], range: ReportRange): Report {
   const totalDays = range === 'week' ? 7 : 30;
   const start = addDays(today(), -(totalDays - 1));
 
@@ -48,7 +48,7 @@ export function buildReport(goals: Goal[], range: ReportRange): Report {
   }
 
   const windowKeys = new Set(days.map((d) => d.key));
-  const byCategory = CATEGORIES.map((c) => {
+  const byCategory = categories.map((c) => {
     let count = 0;
     for (const goal of goals) {
       if (goal.category !== c.id) continue;
