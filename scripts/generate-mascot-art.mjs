@@ -3,6 +3,7 @@
 //
 // Usage: node --env-file=.env scripts/generate-mascot-art.mjs
 
+import { Buffer } from 'node:buffer';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 
