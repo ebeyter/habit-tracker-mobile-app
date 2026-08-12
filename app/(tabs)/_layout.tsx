@@ -45,6 +45,13 @@ export default function TabsLayout() {
         }}
       />
       <Tabs.Screen
+        name="forest"
+        options={{
+          title: 'Orman',
+          tabBarIcon: ({ color, size }) => <Ionicons name="leaf" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
         name="reports"
         options={{
           title: 'Rapor',

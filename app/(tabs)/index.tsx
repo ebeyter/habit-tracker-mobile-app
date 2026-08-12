@@ -5,17 +5,20 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, View
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/EmptyState';
+import { GoalCard } from '@/components/GoalCard';
 import { PermissionBanner } from '@/components/PermissionBanner';
-import { PlantTile } from '@/components/PlantTile';
+import { Sapling } from '@/components/Sapling';
+import { SectionHeader } from '@/components/SectionHeader';
 import { StreakHeader } from '@/components/StreakHeader';
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
-import { gardenSummary, identityLine, plantStateFor } from '@/lib/garden';
-import type { Goal, GoalCategory } from '@/lib/types';
+import { isPastDay } from '@/lib/date';
+import { saplingState } from '@/lib/garden';
+import type { Goal, GoalCategory, OneTimeGoal, RecurringGoal } from '@/lib/types';
 
 type CategoryFilter = GoalCategory | 'all';
 
-export default function GardenScreen() {
+export default function HomeScreen() {
   const { colors, spacing, radius } = useAppTheme();
   const {
     goals,
@@ -23,41 +26,64 @@ export default function GardenScreen() {
     permissionStatus,
     loading,
     completeGoal,
+    undoComplete,
     toggleRecurringToday,
+    toggleSubtask,
     deleteGoal,
     categories,
   } = useGoals();
 
   const [categoryFilter, setCategoryFilter] = useState<CategoryFilter>('all');
 
+  const sapling = useMemo(() => saplingState(goals), [goals]);
+
   const filteredGoals = useMemo(
     () => (categoryFilter === 'all' ? goals : goals.filter((g) => g.category === categoryFilter)),
     [goals, categoryFilter]
   );
 
-  const summary = useMemo(() => gardenSummary(goals), [goals]);
+  const sections = useMemo(() => {
+    const recurring: RecurringGoal[] = [];
+    const overdue: OneTimeGoal[] = [];
+    const active: OneTimeGoal[] = [];
+    const completed: OneTimeGoal[] = [];
 
-  const needsWater = useMemo(
-    () =>
-      filteredGoals.filter((g) => {
-        const s = plantStateFor(g);
-        return s.dueToday && !s.doneToday;
-      }),
-    [filteredGoals]
-  );
+    for (const goal of filteredGoals) {
+      if (goal.kind === 'recurring') recurring.push(goal);
+      else if (goal.status === 'completed') completed.push(goal);
+      else if (isPastDay(new Date(goal.deadline))) overdue.push(goal);
+      else active.push(goal);
+    }
 
-  /** Tapping a plant waters it: completes today for a habit, finishes a one-time goal. */
-  function water(goal: Goal) {
-    if (goal.kind === 'recurring') toggleRecurringToday(goal.id);
-    else if (goal.status === 'active') completeGoal(goal.id);
+    const byDeadline = (a: OneTimeGoal, b: OneTimeGoal) => a.deadline.localeCompare(b.deadline);
+    overdue.sort(byDeadline);
+    active.sort(byDeadline);
+    completed.sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''));
+    recurring.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+
+    return { recurring, overdue, active, completed };
+  }, [filteredGoals]);
+
+  function confirmDelete(goal: Goal) {
+    Alert.alert('Hedefi sil', `"${goal.title}" silinsin mi?`, [
+      { text: 'Vazgeç', style: 'cancel' },
+      { text: 'Sil', style: 'destructive', onPress: () => deleteGoal(goal.id) },
+    ]);
   }
 
-  function openActions(goal: Goal) {
-    Alert.alert(goal.title, identityLine(goal), [
-      { text: 'Düzenle', onPress: () => router.push({ pathname: '/goal-form', params: { id: goal.id } }) },
-      { text: 'Sil', style: 'destructive', onPress: () => deleteGoal(goal.id) },
-      { text: 'Kapat', style: 'cancel' },
-    ]);
+  function renderCard(goal: Goal) {
+    return (
+      <GoalCard
+        key={goal.id}
+        goal={goal}
+        onComplete={() => completeGoal(goal.id)}
+        onUndo={() => undoComplete(goal.id)}
+        onToggleToday={() => toggleRecurringToday(goal.id)}
+        onToggleSubtask={(sid) => toggleSubtask(goal.id, sid)}
+        onEdit={() => router.push({ pathname: '/goal-form', params: { id: goal.id } })}
+        onDelete={() => confirmDelete(goal)}
+      />
+    );
   }
 
   if (loading) {
@@ -71,18 +97,12 @@ export default function GardenScreen() {
   }
 
   const hasGoals = goals.length > 0;
+  const hasFilteredGoals = filteredGoals.length > 0;
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={['top']}>
       <View style={[styles.header, { paddingHorizontal: spacing.lg, paddingTop: spacing.md }]}>
-        <View>
-          <Text style={[styles.title, { color: colors.text }]}>Bahçem</Text>
-          <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-            {hasGoals
-              ? `${summary.total} bitki · ${summary.thriving} serpiliyor${summary.wilting ? ` · ${summary.wilting} solmuş` : ''}`
-              : 'Kim olmak istediğini ek, birlikte büyütelim'}
-          </Text>
-        </View>
+        <Text style={[styles.title, { color: colors.text }]}>Hedeflerim</Text>
         <Pressable onPress={() => router.push('/settings')} hitSlop={12}>
           <Ionicons name="settings-outline" size={24} color={colors.textMuted} />
         </Pressable>
@@ -93,7 +113,11 @@ export default function GardenScreen() {
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl * 2 }}
         showsVerticalScrollIndicator={false}
       >
-        <StreakHeader streak={streak} />
+        <Sapling state={sapling} />
+
+        <View style={{ marginTop: spacing.lg }}>
+          <StreakHeader streak={streak} />
+        </View>
 
         {permissionStatus === 'denied' && (
           <View style={{ marginTop: spacing.md }}>
@@ -105,20 +129,6 @@ export default function GardenScreen() {
           <EmptyState onCreate={() => router.push('/goal-form')} />
         ) : (
           <>
-            {needsWater.length > 0 && (
-              <View
-                style={[
-                  styles.waterBanner,
-                  { backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md },
-                ]}
-              >
-                <Text style={styles.waterEmoji}>💧</Text>
-                <Text style={[styles.waterText, { color: colors.text }]}>
-                  {needsWater.length} bitki bugün su bekliyor — üzerine dokunarak sula.
-                </Text>
-              </View>
-            )}
-
             <View style={[styles.chipRow, { marginTop: spacing.md }]}>
               <CategoryChip
                 label="Tümü"
@@ -137,27 +147,41 @@ export default function GardenScreen() {
               ))}
             </View>
 
-            {filteredGoals.length === 0 ? (
+            {!hasFilteredGoals ? (
               <Text style={[styles.empty, { color: colors.textMuted, marginTop: spacing.lg }]}>
-                Bu kategoride bitki yok.
+                Bu kategoride hedef yok.
               </Text>
             ) : (
-              <View style={[styles.grid, { marginTop: spacing.md }]}>
-                {filteredGoals.map((goal) => (
-                  <View key={goal.id} style={styles.gridCell}>
-                    <PlantTile
-                      goal={goal}
-                      onPress={() => water(goal)}
-                      onLongPress={() => openActions(goal)}
-                    />
-                  </View>
-                ))}
-              </View>
-            )}
+              <>
+                {sections.recurring.length > 0 && (
+                  <>
+                    <SectionHeader title="Tekrarlayan Alışkanlıklar" count={sections.recurring.length} />
+                    {sections.recurring.map(renderCard)}
+                  </>
+                )}
 
-            <Text style={[styles.tip, { color: colors.textMuted }]}>
-              Sulamak için dokun · Düzenlemek için basılı tut
-            </Text>
+                {sections.overdue.length > 0 && (
+                  <>
+                    <SectionHeader title="Gecikti" count={sections.overdue.length} />
+                    {sections.overdue.map(renderCard)}
+                  </>
+                )}
+
+                <SectionHeader title="Aktif" count={sections.active.length} />
+                {sections.active.length === 0 ? (
+                  <Text style={[styles.empty, { color: colors.textMuted }]}>Aktif hedef yok.</Text>
+                ) : (
+                  sections.active.map(renderCard)
+                )}
+
+                {sections.completed.length > 0 && (
+                  <>
+                    <SectionHeader title="Tamamlandı" count={sections.completed.length} />
+                    {sections.completed.map(renderCard)}
+                  </>
+                )}
+              </>
+            )}
           </>
         )}
       </ScrollView>
@@ -215,30 +239,13 @@ const styles = StyleSheet.create({
   centered: { flex: 1, alignItems: 'center', justifyContent: 'center' },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     justifyContent: 'space-between',
     paddingBottom: 4,
   },
   title: {
     fontSize: 28,
     fontWeight: '800',
-  },
-  subtitle: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  waterBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  waterEmoji: {
-    fontSize: 20,
-  },
-  waterText: {
-    flex: 1,
-    fontSize: 13,
-    fontWeight: '600',
   },
   chipRow: {
     flexDirection: 'row',
@@ -253,21 +260,9 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '600',
   },
-  grid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  gridCell: {
-    width: '48%',
-  },
   empty: {
     fontSize: 13,
-  },
-  tip: {
-    fontSize: 11,
-    textAlign: 'center',
-    marginTop: 20,
+    marginBottom: 8,
   },
   fab: {
     position: 'absolute',
