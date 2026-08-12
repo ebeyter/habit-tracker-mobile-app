@@ -91,8 +91,48 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
       setStreak(loadedGoals.length ? freshStreak : cachedStreak ?? freshStreak);
       await saveStreak(freshStreak);
       setLoading(false);
+
+      if (status === 'granted') {
+        const refreshed = await refreshRollingReminders(loadedGoals);
+        if (refreshed) {
+          goalsRef.current = refreshed;
+          setGoals(refreshed);
+          await saveGoals(refreshed);
+        }
+      }
     })();
   }, []);
+
+  /**
+   * "Every N days" habits have no native repeating trigger, so they are scheduled as a
+   * rolling window of dated reminders. Re-scheduling them on launch keeps that window from
+   * running out; returns the updated list, or null when nothing needed refreshing.
+   */
+  async function refreshRollingReminders(loaded: Goal[]): Promise<Goal[] | null> {
+    const needsRefresh = loaded.some(
+      (g) => g.kind === 'recurring' && g.recurrence.type === 'everyN' && g.recurrence.n > 1
+    );
+    if (!needsRefresh) return null;
+
+    return Promise.all(
+      loaded.map(async (goal) => {
+        if (goal.kind !== 'recurring' || goal.recurrence.type !== 'everyN' || goal.recurrence.n <= 1) {
+          return goal;
+        }
+        const res = await rescheduleGoalReminder({
+          kind: 'recurring',
+          title: goal.title,
+          category: goal.category,
+          priority: goal.priority,
+          subtasks: goal.subtasks,
+          recurrence: goal.recurrence,
+          reminderTimes: goal.reminderTimes,
+          notificationIds: goal.notificationIds,
+        });
+        return { ...goal, notificationIds: res.notificationIds };
+      })
+    );
+  }
 
   async function commit(nextGoals: Goal[]) {
     goalsRef.current = nextGoals;
