@@ -29,6 +29,7 @@ type GoalsContextValue = {
   completeGoal: (id: string) => Promise<void>;
   undoComplete: (id: string) => Promise<void>;
   toggleRecurringToday: (id: string) => Promise<void>;
+  toggleRecurringOnDate: (id: string, date: Date) => Promise<void>;
   refreshPermission: () => Promise<void>;
 };
 
@@ -198,10 +199,10 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
     await commit(goalsRef.current.map((g) => (g.id === id ? updated : g)));
   }
 
-  async function toggleRecurringToday(id: string) {
+  async function toggleRecurringOnDate(id: string, date: Date) {
     const existing = goalsRef.current.find((g) => g.id === id);
     if (!existing || existing.kind !== 'recurring') return;
-    const key = dayKey(new Date());
+    const key = dayKey(date);
     const done = existing.completedDates.includes(key);
     const updated: Goal = {
       ...existing,
@@ -210,6 +211,10 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
         : [...existing.completedDates, key],
     };
     await commit(goalsRef.current.map((g) => (g.id === id ? updated : g)));
+  }
+
+  async function toggleRecurringToday(id: string) {
+    await toggleRecurringOnDate(id, new Date());
   }
 
   async function refreshPermission() {
@@ -228,6 +233,7 @@ export function GoalsProvider({ children }: { children: ReactNode }) {
       completeGoal,
       undoComplete,
       toggleRecurringToday,
+      toggleRecurringOnDate,
       refreshPermission,
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps

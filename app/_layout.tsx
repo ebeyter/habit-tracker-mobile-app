@@ -8,7 +8,7 @@ import { GoalsProvider } from '@/context/GoalsContext';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 
 export const unstable_settings = {
-  anchor: 'index',
+  anchor: '(tabs)',
 };
 
 export default function RootLayout() {
@@ -19,7 +19,7 @@ export default function RootLayout() {
       <GoalsProvider>
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <Stack>
-            <Stack.Screen name="index" options={{ headerShown: false }} />
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
             <Stack.Screen
               name="goal-form"
               options={{ presentation: 'modal', headerShown: false }}

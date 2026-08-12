@@ -10,12 +10,7 @@ function diffInDays(a: Date, b: Date): number {
   return Math.round((a.getTime() - b.getTime()) / (24 * 60 * 60 * 1000));
 }
 
-/**
- * Recomputes streak data from scratch out of the goals array (source of truth).
- * Recomputing rather than incrementing keeps undo, multi-completion-per-day and
- * app-restart scenarios correct without extra bookkeeping.
- */
-function completionDayKeys(goals: Goal[]): string[] {
+export function completionDayKeys(goals: Goal[]): string[] {
   const keys: string[] = [];
   for (const goal of goals) {
     if (goal.kind === 'onetime') {
@@ -29,6 +24,11 @@ function completionDayKeys(goals: Goal[]): string[] {
   return keys;
 }
 
+/**
+ * Recomputes streak data from scratch out of the goals array (source of truth).
+ * Recomputing rather than incrementing keeps undo, multi-completion-per-day and
+ * app-restart scenarios correct without extra bookkeeping.
+ */
 export function computeStreak(goals: Goal[]): StreakData {
   const dayKeys = Array.from(new Set(completionDayKeys(goals))).sort();
 

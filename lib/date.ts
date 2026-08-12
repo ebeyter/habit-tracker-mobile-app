@@ -39,6 +39,15 @@ export function formatDate(dateIso: string): string {
   return d.toLocaleDateString('tr-TR', { day: 'numeric', month: 'long', year: 'numeric' });
 }
 
+/** "Bugün" / "Dün" / "Yarın" when close, otherwise a weekday + date label */
+export function formatDayLabel(date: Date): string {
+  const diff = Math.round((startOfDay(date).getTime() - today().getTime()) / (24 * 60 * 60 * 1000));
+  if (diff === 0) return 'Bugün';
+  if (diff === -1) return 'Dün';
+  if (diff === 1) return 'Yarın';
+  return date.toLocaleDateString('tr-TR', { weekday: 'long', day: 'numeric', month: 'long' });
+}
+
 export function daysUntil(dateIso: string): number {
   const d = startOfDay(new Date(dateIso));
   const diffMs = d.getTime() - today().getTime();

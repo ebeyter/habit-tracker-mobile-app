@@ -212,7 +212,7 @@ export default function GoalsScreen() {
             {
               backgroundColor: colors.tint,
               borderRadius: radius.pill,
-              bottom: spacing.xl,
+              bottom: spacing.md,
               right: spacing.lg,
               opacity: pressed ? 0.85 : 1,
             },
