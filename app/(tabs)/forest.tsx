@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
-import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ImageBackground, ScrollView, StyleSheet, Text, View } from 'react-native';
 import type { ImageSourcePropType } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import {
@@ -19,6 +20,42 @@ const TREE_ART: Record<TreeSpecies, ImageSourcePropType> = {
   pine: require('@/assets/plants/tree-pine.png'),
   blossom: require('@/assets/plants/tree-blossom.png'),
 };
+const MEADOW = require('@/assets/plants/forest-bg.png');
+const BUSH = require('@/assets/plants/bush.png');
+const ROCK = require('@/assets/plants/rock.png');
+
+const SCENE_HEIGHT = 420;
+/** Where the ground starts in the backdrop — trees are planted below this line. */
+const HORIZON = 0.46;
+
+/**
+ * Deterministic scatter: trees planted later stand nearer the camera, so each row sits
+ * lower, larger and more saturated than the one behind it. Keyed off the index so a
+ * given tree keeps its spot between renders.
+ */
+function placement(index: number, total: number) {
+  const perRow = 3;
+  const row = Math.floor(index / perRow);
+  const rows = Math.max(1, Math.ceil(total / perRow));
+  const posInRow = index % perRow;
+
+  // depth: 0 = furthest row, 1 = closest
+  const depth = rows === 1 ? 0.65 : row / (rows - 1);
+
+  const jitterX = ((index * 37) % 11) / 11 - 0.5; // stable pseudo-random nudge
+  const jitterY = ((index * 53) % 7) / 7 - 0.5;
+
+  const left = (posInRow + 0.5) / perRow + jitterX * 0.12;
+  const bottomRatio = 0.04 + depth * 0.34 + jitterY * 0.03;
+  const size = 58 + depth * 52;
+
+  return {
+    left: `${Math.min(88, Math.max(4, left * 100))}%` as const,
+    bottom: (1 - HORIZON) * SCENE_HEIGHT * bottomRatio,
+    size,
+    opacity: 0.72 + depth * 0.28,
+  };
+}
 
 export default function ForestScreen() {
   const { colors, spacing, radius } = useAppTheme();
@@ -30,47 +67,51 @@ export default function ForestScreen() {
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={['top']}>
-      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
-        <Text style={[styles.title, { color: colors.text }]}>Ormanım</Text>
-        <Text style={[styles.subtitle, { color: colors.textMuted }]}>
-          {earned === 0
+      <ScreenHeader
+        title="Ormanım"
+        subtitle={
+          earned === 0
             ? `İlk ağacına ${COMPLETIONS_PER_TREE - state.progress} tamamlama kaldı`
-            : `${earned} ağaç diktin · toplam ${trees.length} ağaç`}
-        </Text>
-      </View>
+            : `${earned} ağaç diktin · ormanda ${trees.length} ağaç`
+        }
+      />
 
       <ScrollView
         style={styles.flex}
         contentContainerStyle={{ padding: spacing.lg, paddingBottom: spacing.xxl }}
         showsVerticalScrollIndicator={false}
       >
-        <View
-          style={[
-            styles.grove,
-            { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md },
-          ]}
+        <ImageBackground
+          source={MEADOW}
+          resizeMode="cover"
+          style={[styles.scene, { borderRadius: radius.lg }]}
+          imageStyle={{ borderRadius: radius.lg }}
         >
+          {/* Props first so trees always overlap them */}
+          <Image source={ROCK} style={[styles.prop, { left: '8%', bottom: 18, width: 34, height: 34 }]} />
+          <Image source={BUSH} style={[styles.prop, { right: '10%', bottom: 12, width: 44, height: 44 }]} />
+          <Image source={BUSH} style={[styles.prop, { left: '46%', bottom: 92, width: 28, height: 28, opacity: 0.8 }]} />
+
           {trees.map((species, index) => {
-            const isStarter = index < STARTER_TREES.length;
+            const p = placement(index, trees.length);
             return (
-              <View key={`${species}-${index}`} style={styles.treeCell}>
-                <Image
-                  source={TREE_ART[species]}
-                  style={[styles.tree, isStarter && styles.starterTree]}
-                  resizeMode="contain"
-                />
-                <Text style={[styles.treeLabel, { color: colors.textMuted }]}>
-                  {isStarter ? 'Başlangıç' : `${index - STARTER_TREES.length + 1}. ağacın`}
-                </Text>
-              </View>
+              <Image
+                key={`${species}-${index}`}
+                source={TREE_ART[species]}
+                resizeMode="contain"
+                style={[
+                  styles.tree,
+                  { left: p.left, bottom: p.bottom, width: p.size, height: p.size, opacity: p.opacity },
+                ]}
+              />
             );
           })}
-        </View>
+        </ImageBackground>
 
         <View
           style={[
             styles.progressCard,
-            { backgroundColor: colors.surfaceAlt, borderRadius: radius.md, padding: spacing.md, marginTop: spacing.md },
+            { backgroundColor: colors.surface, borderRadius: radius.lg, padding: spacing.md, marginTop: spacing.md },
           ]}
         >
           <Text style={[styles.progressTitle, { color: colors.text }]}>Büyüyen fidanın</Text>
@@ -88,8 +129,8 @@ export default function ForestScreen() {
         </View>
 
         <Text style={[styles.note, { color: colors.textMuted }]}>
-          Hedeflerini tamamladıkça bahçendeki fidan büyür; olgunlaşınca buraya taşınır ve yerine yeni
-          bir fidan diker.
+          Hedeflerini tamamladıkça fidanın büyür; olgunlaşınca bu ormana dikilir ve yerine yeni bir
+          fidan gelir. Ağaçların öne doğru sıralanır — en yenisi en önde.
         </Text>
       </ScrollView>
     </SafeAreaView>
@@ -98,37 +139,17 @@ export default function ForestScreen() {
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
-  title: {
-    fontSize: 28,
-    fontWeight: '800',
-  },
-  subtitle: {
-    fontSize: 13,
-    marginTop: 2,
-  },
-  grove: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-    gap: 4,
-  },
-  treeCell: {
-    width: '33%',
-    alignItems: 'center',
-    paddingVertical: 8,
+  scene: {
+    height: SCENE_HEIGHT,
+    overflow: 'hidden',
+    justifyContent: 'flex-end',
   },
   tree: {
-    width: 88,
-    height: 88,
+    position: 'absolute',
   },
-  // Starter trees are the grove the user is handed, dimmed so earned ones stand out.
-  starterTree: {
-    opacity: 0.55,
-  },
-  treeLabel: {
-    fontSize: 10,
-    fontWeight: '600',
-    marginTop: 2,
+  prop: {
+    position: 'absolute',
+    resizeMode: 'contain',
   },
   progressCard: {
     gap: 8,

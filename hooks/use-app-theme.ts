@@ -5,14 +5,18 @@ export function useAppTheme() {
   const { scheme, accent } = useSettings();
   const base = Colors[scheme];
 
+  const tint = scheme === 'dark' ? accent.dark : accent.light;
+  const surfaces = scheme === 'dark' ? accent.surfacesDark : accent.surfacesLight;
+
   return {
-    // The accent preset overrides the palette's tint/gradient so the whole UI follows
-    // whichever color the user picked in Settings.
+    // The accent preset supplies both the highlight color and the neutral ramp, so picking
+    // a different accent in Settings repaints the whole app rather than just the buttons.
     colors: {
       ...base,
-      tint: scheme === 'dark' ? accent.dark : accent.light,
-      tabIconSelected: scheme === 'dark' ? accent.dark : accent.light,
-      gradientStart: scheme === 'dark' ? accent.dark : accent.light,
+      ...surfaces,
+      tint,
+      tabIconSelected: tint,
+      gradientStart: tint,
       gradientEnd: accent.end,
     },
     spacing: Spacing,

@@ -7,6 +7,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState } from '@/components/EmptyState';
 import { GoalCard } from '@/components/GoalCard';
 import { PermissionBanner } from '@/components/PermissionBanner';
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { Sapling } from '@/components/Sapling';
 import { SectionHeader } from '@/components/SectionHeader';
 import { StreakHeader } from '@/components/StreakHeader';
@@ -101,12 +102,7 @@ export default function HomeScreen() {
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={['top']}>
-      <View style={[styles.header, { paddingHorizontal: spacing.lg, paddingTop: spacing.md }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Hedeflerim</Text>
-        <Pressable onPress={() => router.push('/settings')} hitSlop={12}>
-          <Ionicons name="settings-outline" size={24} color={colors.textMuted} />
-        </Pressable>
-      </View>
+      <ScreenHeader title="Hedeflerim" />
 
       <ScrollView
         style={styles.flex}

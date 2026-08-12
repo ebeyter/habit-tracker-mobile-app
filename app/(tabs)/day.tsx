@@ -3,6 +3,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { categoryEmoji } from '@/lib/categories';
@@ -41,7 +42,9 @@ export default function DayScreen() {
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={['top']}>
-      <View style={[styles.dayNav, { paddingHorizontal: spacing.lg, paddingTop: spacing.md }]}>
+      <ScreenHeader title="Gün Gün" />
+
+      <View style={[styles.dayNav, { paddingHorizontal: spacing.lg, paddingTop: spacing.sm }]}>
         <Pressable
           onPress={() => setSelectedDate((d) => addDays(d, -1))}
           hitSlop={12}

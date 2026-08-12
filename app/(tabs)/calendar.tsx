@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import {
@@ -126,6 +127,7 @@ export default function CalendarScreen() {
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={['top']}>
+      <ScreenHeader title="Takvim" />
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}

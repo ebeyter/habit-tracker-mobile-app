@@ -67,37 +67,66 @@ npx expo install <paket-adi>
 ## Çalıştırma (Expo Go)
 
 ```bash
-npx expo start
+npx expo start --tunnel
 ```
 
-Terminalde `i` / `a` ile simulator/emulator açabilir, ya da QR kodu Expo Go ile gerçek cihazdan okutabilirsin. Local notification'lar Expo Go içinde tam çalışır (yalnızca remote push Expo Go'da desteklenmiyor, bu proje onu kullanmıyor).
+Terminalde `i` / `a` ile simulator/emulator açabilir, ya da QR kodu Expo Go ile gerçek cihazdan okutabilirsin. Local notification'lar Expo Go içinde çalışır (yalnızca remote push Expo Go'da desteklenmiyor, bu proje onu kullanmıyor).
+
+> QR kod yalnızca bu terminal çalışırken geçerlidir; `Ctrl + C` sunucuyu durdurur.
 
 ## Local Development Build
 
 `expo-notifications`, `async-storage` ve `datetimepicker` native modül içerdiğinden, tam native davranışı (izin promptları, native tarih seçici vb.) test etmek için development build önerilir:
 
 ```bash
-npx expo install expo-dev-client
-npx expo prebuild
-npx expo run:ios       # Xcode + iOS Simulator gerekir
-npx expo run:android   # Android Studio + emulator/cihaz gerekir
+npx expo install expo-dev-client   # projede kurulu
+npx expo run:ios                   # macOS + Xcode gerekir
+npx expo run:android               # Android Studio + emulator/cihaz gerekir
 ```
 
-## EAS Build (Android preview / iOS)
+`run:ios` / `run:android` ilk çalıştırmada native `ios` ve `android` klasörlerini üretir, uygulamayı build edip cihaza yükler ve Metro'yu başlatır.
+
+## EAS Build
 
 ```bash
 npm install -g eas-cli
-eas login
+eas login && eas whoami
 eas build:configure
+```
 
-# Android preview (APK)
-eas build -p android --profile preview
+**Development build** (dev client ile geliştirmeye devam etmek için):
 
-# iOS (Apple Developer hesabı gerekir)
-eas build -p ios --profile preview
+```bash
+eas build --profile development --platform android
+eas device:create                                  # yalnızca fiziksel iPhone için
+eas build --profile development --platform ios
+```
+
+Kurduktan sonra geliştirmeye şöyle devam edilir:
+
+```bash
+npx expo start --dev-client --tunnel
+```
+
+**Preview build** (Metro'ya bağlı olmadan paylaşılabilir test sürümü):
+
+```bash
+eas build --profile preview --platform android     # APK
+eas build --profile preview --platform ios
 ```
 
 Build tamamlanınca EAS, indirilebilir APK / build linkini verir.
+
+### Ne zaman yeniden build gerekir?
+
+Yalnızca **native runtime** değiştiğinde (`npx expo run:*` veya `eas build --profile development`):
+
+- Native kod içeren yeni bir paket / config plugin eklendiğinde veya güncellendiğinde
+- `app.json` içindeki permission, plugin, icon, splash, scheme, package / bundle identifier değiştiğinde
+- `ios` veya `android` klasöründeki native dosyalar değiştiğinde
+- Expo SDK veya React Native sürümü değiştiğinde
+
+Sadece ekran, component, metin, state logic, TypeScript/JavaScript veya style değiştiyse yeniden build gerekmez — dev server yeterlidir.
 
 ## Test senaryosu (final test)
 

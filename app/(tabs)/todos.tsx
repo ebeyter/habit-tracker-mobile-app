@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import type { TodoItem } from '@/lib/types';
@@ -39,16 +40,16 @@ export default function TodosScreen() {
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={['top']}>
-      <View style={[styles.header, { paddingHorizontal: spacing.lg, paddingTop: spacing.md }]}>
-        <Text style={[styles.title, { color: colors.text }]}>Yapılacaklar</Text>
-        {done.length > 0 && (
-          <Pressable onPress={clearDoneTodos} hitSlop={10}>
-            <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700' }}>
-              Tamamlananları temizle
-            </Text>
-          </Pressable>
-        )}
-      </View>
+      <ScreenHeader
+        title="Yapılacaklar"
+        action={
+          done.length > 0 ? (
+            <Pressable onPress={clearDoneTodos} hitSlop={10}>
+              <Text style={{ color: colors.danger, fontSize: 13, fontWeight: '700' }}>Temizle</Text>
+            </Pressable>
+          ) : undefined
+        }
+      />
 
       <KeyboardAvoidingView
         style={styles.flex}

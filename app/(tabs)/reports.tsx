@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ScreenHeader } from '@/components/ScreenHeader';
 import { useGoals } from '@/context/GoalsContext';
 import { useAppTheme } from '@/hooks/use-app-theme';
 import { buildReport, type ReportRange } from '@/lib/reports';
@@ -17,9 +18,7 @@ export default function ReportsScreen() {
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: colors.background }]} edges={['top']}>
-      <View style={{ paddingHorizontal: spacing.lg, paddingTop: spacing.md }}>
-        <Text style={[styles.title, { color: colors.text }]}>Rapor</Text>
-      </View>
+      <ScreenHeader title="Rapor" />
 
       <ScrollView
         style={styles.flex}
